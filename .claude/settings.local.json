@@ -11,7 +11,8 @@
       "Bash(dpkg:*)",
       "mcp__ide__executeCode",
       "Bash(/workspace/.venv/bin/pip install:*)",
-      "Bash(/workspace/.venv/bin/python:*)"
+      "Bash(/workspace/.venv/bin/python:*)",
+      "Bash(python -m pytest:*)"
     ]
   }
 }

@@ -29,8 +29,8 @@ class TestNotebookStructure(unittest.TestCase):
         self.assertEqual(self.nb["nbformat"], 4)
 
     def test_cell_count(self):
-        """Notebook has the expected number of cells (29)."""
-        self.assertEqual(len(self.nb["cells"]), 29)
+        """Notebook has the expected number of cells (34)."""
+        self.assertEqual(len(self.nb["cells"]), 34)
 
     def test_cell_types_alternate_correctly(self):
         """Verify the expected pattern of markdown and code cells."""
@@ -63,7 +63,12 @@ class TestNotebookStructure(unittest.TestCase):
             "code",      # 26: Final evaluation
             "code",      # 27: Per-class F1 bar chart
             "code",      # 28: Save results
-            "markdown",  # 29: Summary
+            "markdown",  # 29: Section 11 header
+            "code",      # 30: run_all_experiments
+            "code",      # 31: print summary table
+            "markdown",  # 32: Results by Budget header
+            "code",      # 33: Budget visualization
+            "markdown",  # 34: Summary
         ]
         actual_types = [cell["cell_type"] for cell in self.nb["cells"]]
         self.assertEqual(actual_types, expected_types)
