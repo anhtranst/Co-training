@@ -1,8 +1,11 @@
 # LG-CoTrain
 
+> **Results Dashboard** — View experiment results: [results/dashboard.html](https://htmlpreview.github.io/?https://github.com/anhtranst/Co-training/blob/main/results/dashboard.html)
+> _(Open locally in a browser; rebuild anytime with `python results/build_dashboard.py`)_
+
 A semi-supervised co-training pipeline for humanitarian tweet classification during disaster events. Combines a small set of human-labeled tweets with GPT-4o pseudo-labeled tweets using a 3-phase training approach with two BERT models.
 
-Based on the paper: *Cornelia et al. (2025) — Co-Training with LLM-Generated Pseudo-Labels* (see `docs/Cornelia etal2025-Cotraining.pdf`).
+Based on the paper: _Cornelia et al. (2025) — Co-Training with LLM-Generated Pseudo-Labels_ (see `docs/Cornelia etal2025-Cotraining.pdf`).
 
 ## Overview
 
@@ -19,18 +22,18 @@ The pipeline dynamically detects which classes are present in each event's data 
 
 The full 10-class superset for humanitarian tweet classification:
 
-| Class | Description |
-|---|---|
-| `caution_and_advice` | Warnings and safety advice |
-| `displaced_people_and_evacuations` | Evacuations, displacement |
-| `infrastructure_and_utility_damage` | Damage to buildings, roads, utilities |
-| `injured_or_dead_people` | Casualties and injuries |
-| `missing_or_found_people` | Missing/found persons |
-| `not_humanitarian` | Irrelevant tweets |
-| `other_relevant_information` | Other disaster-related info |
-| `requests_or_urgent_needs` | Calls for help and resources |
-| `rescue_volunteering_or_donation_effort` | Rescue and aid efforts |
-| `sympathy_and_support` | Expressions of sympathy |
+| Class                                    | Description                           |
+| ---------------------------------------- | ------------------------------------- |
+| `caution_and_advice`                     | Warnings and safety advice            |
+| `displaced_people_and_evacuations`       | Evacuations, displacement             |
+| `infrastructure_and_utility_damage`      | Damage to buildings, roads, utilities |
+| `injured_or_dead_people`                 | Casualties and injuries               |
+| `missing_or_found_people`                | Missing/found persons                 |
+| `not_humanitarian`                       | Irrelevant tweets                     |
+| `other_relevant_information`             | Other disaster-related info           |
+| `requests_or_urgent_needs`               | Calls for help and resources          |
+| `rescue_volunteering_or_donation_effort` | Rescue and aid efforts                |
+| `sympathy_and_support`                   | Expressions of sympathy               |
 
 Not all events contain every class. The pipeline automatically detects the subset present in each event's data files.
 
@@ -80,18 +83,18 @@ Pseudo-label CSVs have columns: `tweet_id`, `tweet_text`, `predicted_label`, `co
 
 ### Disaster Events
 
-| Event | Year |
-|---|---|
+| Event                     | Year |
+| ------------------------- | ---- |
 | california_wildfires_2018 | 2018 |
-| canada_wildfires_2016 | 2016 |
-| cyclone_idai_2019 | 2019 |
-| hurricane_dorian_2019 | 2019 |
-| hurricane_florence_2018 | 2018 |
-| hurricane_harvey_2017 | 2017 |
-| hurricane_irma_2017 | 2017 |
-| hurricane_maria_2017 | 2017 |
-| kaikoura_earthquake_2016 | 2016 |
-| kerala_floods_2018 | 2018 |
+| canada_wildfires_2016     | 2016 |
+| cyclone_idai_2019         | 2019 |
+| hurricane_dorian_2019     | 2019 |
+| hurricane_florence_2018   | 2018 |
+| hurricane_harvey_2017     | 2017 |
+| hurricane_irma_2017       | 2017 |
+| hurricane_maria_2017      | 2017 |
+| kaikoura_earthquake_2016  | 2016 |
+| kerala_floods_2018        | 2018 |
 
 Each event has 4 budget levels (5, 10, 25, 50 labeled tweets per class) and 3 seed sets.
 
