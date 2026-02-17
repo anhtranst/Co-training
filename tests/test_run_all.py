@@ -274,5 +274,105 @@ class TestRunAllCLI(unittest.TestCase):
                 self.assertEqual(kwargs["cotrain_epochs"], 5)
 
 
+class TestOnExperimentDoneCallback(unittest.TestCase):
+    """Tests for the _on_experiment_done callback parameter."""
+
+    def test_callback_called_for_all_12(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        calls = []
+
+        def recorder(event, budget, seed_set, status):
+            calls.append((event, budget, seed_set, status))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_all_experiments(
+                "test_event",
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=_fake_trainer_cls,
+                _on_experiment_done=recorder,
+            )
+
+        self.assertEqual(len(calls), 12)
+        for event, budget, seed_set, status in calls:
+            self.assertEqual(event, "test_event")
+            self.assertEqual(status, "done")
+
+    def test_callback_reports_skipped(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        calls = []
+
+        def recorder(event, budget, seed_set, status):
+            calls.append((event, budget, seed_set, status))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Pre-create metrics.json for budget=5, seed=1
+            out_dir = Path(tmpdir) / "test_event" / "5_set1"
+            out_dir.mkdir(parents=True)
+            existing = _make_result(5, 1)
+            (out_dir / "metrics.json").write_text(json.dumps(existing))
+
+            run_all_experiments(
+                "test_event",
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=_fake_trainer_cls,
+                _on_experiment_done=recorder,
+            )
+
+        self.assertEqual(len(calls), 12)
+        skipped = [(e, b, s, st) for e, b, s, st in calls if st == "skipped"]
+        done = [(e, b, s, st) for e, b, s, st in calls if st == "done"]
+        self.assertEqual(len(skipped), 1)
+        self.assertEqual(skipped[0], ("test_event", 5, 1, "skipped"))
+        self.assertEqual(len(done), 11)
+
+    def test_callback_reports_failed(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        calls = []
+
+        def recorder(event, budget, seed_set, status):
+            calls.append((event, budget, seed_set, status))
+
+        def failing_cls(config):
+            mock = MagicMock()
+            if config.budget == 10 and config.seed_set == 2:
+                mock.run.side_effect = RuntimeError("OOM")
+            else:
+                mock.run.return_value = _make_result(config.budget, config.seed_set)
+            return mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_all_experiments(
+                "test_event",
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=failing_cls,
+                _on_experiment_done=recorder,
+            )
+
+        self.assertEqual(len(calls), 12)
+        failed = [(e, b, s, st) for e, b, s, st in calls if st == "failed"]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0], ("test_event", 10, 2, "failed"))
+
+    def test_no_callback_is_fine(self):
+        """Passing no callback should not raise errors."""
+        from lg_cotrain.run_all import run_all_experiments
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results = run_all_experiments(
+                "test_event",
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=_fake_trainer_cls,
+            )
+
+        self.assertEqual(len(results), 12)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

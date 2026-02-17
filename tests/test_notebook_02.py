@@ -127,6 +127,23 @@ class TestNotebook02Content(unittest.TestCase):
         self.assertIn("completed_events", run_cell)
         self.assertIn("json.load", run_cell)
 
+    def test_progress_tracker_defined(self):
+        """Cell 4 defines a ProgressTracker class for time tracking."""
+        run_cell = "".join(self.nb["cells"][4]["source"])
+        self.assertIn("class ProgressTracker", run_cell)
+        self.assertIn("def update(", run_cell)
+
+    def test_progress_callback_passed(self):
+        """Cell 4 passes a callback to run_all_experiments."""
+        run_cell = "".join(self.nb["cells"][4]["source"])
+        self.assertIn("_on_experiment_done", run_cell)
+
+    def test_progress_displays_eta(self):
+        """Progress tracker prints percentage and ETA."""
+        run_cell = "".join(self.nb["cells"][4]["source"])
+        self.assertIn("PROGRESS", run_cell)
+        self.assertIn("ETA", run_cell)
+
     def test_cross_disaster_summary(self):
         summary_cell = "".join(self.nb["cells"][6]["source"])
         self.assertIn("all_event_results", summary_cell)

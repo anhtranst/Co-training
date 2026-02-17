@@ -29,11 +29,16 @@ def run_all_experiments(
     data_root="/workspace/data",
     results_root="/workspace/results",
     _trainer_cls=None,
+    _on_experiment_done=None,
 ):
     """Run all budget x seed_set combinations for *event*.
 
     Returns a list of 12 result dicts (or ``None`` for failed experiments).
     Experiments whose ``metrics.json`` already exists are loaded and skipped.
+
+    If *_on_experiment_done* is provided, it is called after each experiment
+    with ``(event, budget, seed_set, status)`` where *status* is one of
+    ``"done"``, ``"skipped"``, or ``"failed"``.
     """
     if _trainer_cls is None:
         from .trainer import LGCoTrainer  # lazy — avoids torch import at module level
@@ -62,6 +67,8 @@ def run_all_experiments(
                     f"[{idx}/{total}] budget={budget}, seed={seed_set}"
                     f" -- SKIPPED (exists)"
                 )
+                if _on_experiment_done is not None:
+                    _on_experiment_done(event, budget, seed_set, "skipped")
                 continue
 
             print(f"[{idx}/{total}] budget={budget}, seed={seed_set} -- starting...")
@@ -90,12 +97,16 @@ def run_all_experiments(
                     f"[{idx}/{total}] budget={budget}, seed={seed_set}"
                     f" -- done (macro_f1={result['test_macro_f1']:.4f})"
                 )
+                if _on_experiment_done is not None:
+                    _on_experiment_done(event, budget, seed_set, "done")
             except Exception as e:
                 logger.error(
                     f"Experiment budget={budget}, seed={seed_set} failed: {e}"
                 )
                 all_results.append(None)
                 failed += 1
+                if _on_experiment_done is not None:
+                    _on_experiment_done(event, budget, seed_set, "failed")
 
             # Free GPU memory between experiments
             try:
