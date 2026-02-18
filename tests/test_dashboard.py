@@ -29,7 +29,8 @@ from lg_cotrain.run_all import BUDGETS, SEED_SETS
 
 
 def _make_metric(event="california_wildfires_2018", budget=5, seed_set=1,
-                 macro_f1=0.55, error_rate=35.0, num_classes=10):
+                 macro_f1=0.55, error_rate=35.0, num_classes=10,
+                 test_ece=0.12, dev_ece=0.10):
     """Build a metrics dict matching trainer.run() output."""
     return {
         "event": event,
@@ -37,9 +38,11 @@ def _make_metric(event="california_wildfires_2018", budget=5, seed_set=1,
         "seed_set": seed_set,
         "test_error_rate": error_rate,
         "test_macro_f1": macro_f1,
+        "test_ece": test_ece,
         "test_per_class_f1": [macro_f1] * num_classes,
         "dev_error_rate": error_rate - 1.0,
         "dev_macro_f1": macro_f1 + 0.01,
+        "dev_ece": dev_ece,
         "lambda1_mean": 1.08,
         "lambda1_std": 0.21,
         "lambda2_mean": 0.56,
@@ -173,6 +176,20 @@ class TestBuildPivotData(unittest.TestCase):
         self.assertAlmostEqual(pivot["california_wildfires_2018"][5]["f1_mean"], 0.60)
         self.assertAlmostEqual(pivot["canada_wildfires_2016"][5]["f1_mean"], 0.50)
 
+    def test_ece_aggregated(self):
+        metrics = [_make_metric(budget=5, test_ece=0.15)]
+        pivot = build_pivot_data(metrics)
+        entry = pivot["california_wildfires_2018"][5]
+        self.assertAlmostEqual(entry["ece_mean"], 0.15)
+
+    def test_ece_missing_graceful(self):
+        """Old metrics without test_ece should still work."""
+        m = _make_metric()
+        del m["test_ece"]
+        pivot = build_pivot_data([m])
+        entry = pivot["california_wildfires_2018"][5]
+        self.assertIsNone(entry["ece_mean"])
+
 
 class TestBuildOverallMeans(unittest.TestCase):
     def test_single_event(self):
@@ -258,11 +275,27 @@ class TestComputeSummaryCards(unittest.TestCase):
         s = compute_summary_cards(metrics)
         self.assertEqual(s["disasters_done"], 2)
 
+    def test_avg_ece(self):
+        metrics = [
+            _make_metric(test_ece=0.10),
+            _make_metric(test_ece=0.20, seed_set=2),
+        ]
+        s = compute_summary_cards(metrics)
+        self.assertAlmostEqual(s["avg_ece"], 0.15)
+
+    def test_avg_ece_missing_graceful(self):
+        """Metrics without test_ece should not break summary."""
+        m = _make_metric()
+        del m["test_ece"]
+        s = compute_summary_cards([m])
+        self.assertIsNone(s["avg_ece"])
+
     def test_empty_metrics(self):
         s = compute_summary_cards([])
         self.assertEqual(s["completed"], 0)
         self.assertIsNone(s["avg_f1"])
         self.assertIsNone(s["avg_err"])
+        self.assertIsNone(s["avg_ece"])
         self.assertEqual(s["disasters_done"], 0)
 
 
@@ -289,6 +322,7 @@ class TestGenerateHtml(unittest.TestCase):
         html = generate_html([], "/tmp/fake")
         self.assertIn("Macro-F1 by Disaster", html)
         self.assertIn("Error Rate", html)
+        self.assertIn("ECE", html)
         self.assertIn("Lambda Weights", html)
 
     def test_contains_all_results_div(self):

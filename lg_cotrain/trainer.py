@@ -22,7 +22,7 @@ from .data_loading import (
     load_tsv,
     split_labeled_set,
 )
-from .evaluate import compute_metrics, ensemble_predict
+from .evaluate import compute_ece, compute_metrics, ensemble_predict
 from .model import create_fresh_model
 from .utils import EarlyStopping, get_device, set_seed, setup_logging
 from .weight_tracker import WeightTracker
@@ -267,7 +267,7 @@ class LGCoTrainer:
             lambda2 = cotrain_tracker2.compute_lambda_conservative()
 
             # Evaluate ensemble on dev
-            dev_preds, dev_labels = ensemble_predict(model1, model2, loader_dev, self.device)
+            dev_preds, dev_labels, _ = ensemble_predict(model1, model2, loader_dev, self.device)
             dev_metrics = compute_metrics(dev_labels, dev_preds)
 
             logger.info(
@@ -309,7 +309,7 @@ class LGCoTrainer:
                 opt2.step()
 
             # Evaluate ensemble on dev
-            dev_preds, dev_labels = ensemble_predict(model1, model2, loader_dev, self.device)
+            dev_preds, dev_labels, _ = ensemble_predict(model1, model2, loader_dev, self.device)
             dev_metrics = compute_metrics(dev_labels, dev_preds)
             dev_f1 = dev_metrics["macro_f1"]
 
@@ -334,10 +334,12 @@ class LGCoTrainer:
         # Final Evaluation
         # ========================
         logger.info("=== Final Evaluation ===")
-        test_preds, test_labels = ensemble_predict(model1, model2, loader_test, self.device)
+        test_preds, test_labels, test_probs = ensemble_predict(model1, model2, loader_test, self.device)
         test_metrics = compute_metrics(test_labels, test_preds)
-        dev_preds, dev_labels = ensemble_predict(model1, model2, loader_dev, self.device)
+        test_ece = compute_ece(test_labels, test_probs)
+        dev_preds, dev_labels, dev_probs = ensemble_predict(model1, model2, loader_dev, self.device)
         dev_metrics = compute_metrics(dev_labels, dev_preds)
+        dev_ece = compute_ece(dev_labels, dev_probs)
 
         results = {
             "event": cfg.event,
@@ -345,9 +347,11 @@ class LGCoTrainer:
             "seed_set": cfg.seed_set,
             "test_error_rate": test_metrics["error_rate"],
             "test_macro_f1": test_metrics["macro_f1"],
+            "test_ece": test_ece,
             "test_per_class_f1": test_metrics["per_class_f1"],
             "dev_error_rate": dev_metrics["error_rate"],
             "dev_macro_f1": dev_metrics["macro_f1"],
+            "dev_ece": dev_ece,
             "lambda1_mean": float(lambda1.mean()),
             "lambda1_std": float(lambda1.std()),
             "lambda2_mean": float(lambda2.mean()),
@@ -362,7 +366,8 @@ class LGCoTrainer:
         logger.info(f"Results saved to {output_path}")
         logger.info(
             f"Test error rate: {test_metrics['error_rate']:.2f}%, "
-            f"Test macro-F1: {test_metrics['macro_f1']:.4f}"
+            f"Test macro-F1: {test_metrics['macro_f1']:.4f}, "
+            f"Test ECE: {test_ece:.4f}"
         )
 
         return results

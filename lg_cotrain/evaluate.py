@@ -52,10 +52,82 @@ def _compute_f1_pure(y_true: list, y_pred: list):
     return macro_f1, f1s
 
 
+def compute_ece(y_true, y_probs, n_bins=15):
+    """Compute Expected Calibration Error.
+
+    Args:
+        y_true: Ground truth label ids (list or array), length n.
+        y_probs: Predicted probability matrix, shape (n, n_classes).
+                 Can be a numpy array or list of lists.
+        n_bins: Number of equal-width bins over [0, 1].
+
+    Returns:
+        ECE as a float in [0, 1].
+    """
+    try:
+        import numpy as np
+        y_true = np.asarray(y_true)
+        y_probs = np.asarray(y_probs, dtype=float)
+        confidences = y_probs.max(axis=1)
+        predictions = y_probs.argmax(axis=1)
+        correct = (predictions == y_true).astype(float)
+        n = len(y_true)
+        if n == 0:
+            return 0.0
+        ece = 0.0
+        for i in range(n_bins):
+            lo = i / n_bins
+            hi = (i + 1) / n_bins
+            mask = (confidences > lo) & (confidences <= hi) if i > 0 else (confidences <= hi)
+            count = mask.sum()
+            if count > 0:
+                acc = correct[mask].mean()
+                conf = confidences[mask].mean()
+                ece += (count / n) * abs(acc - conf)
+        return float(ece)
+    except ImportError:
+        return _compute_ece_pure(list(y_true), y_probs, n_bins)
+
+
+def _compute_ece_pure(y_true, y_probs, n_bins=15):
+    """Pure-Python ECE computation."""
+    n = len(y_true)
+    if n == 0:
+        return 0.0
+    # Extract max prob and predicted class per sample
+    confidences = []
+    predictions = []
+    for row in y_probs:
+        row = list(row)
+        max_p = max(row)
+        confidences.append(max_p)
+        predictions.append(row.index(max_p))
+    correct = [1.0 if p == t else 0.0 for p, t in zip(predictions, y_true)]
+    ece = 0.0
+    for i in range(n_bins):
+        lo = i / n_bins
+        hi = (i + 1) / n_bins
+        indices = []
+        for j in range(n):
+            if i == 0:
+                if confidences[j] <= hi:
+                    indices.append(j)
+            else:
+                if lo < confidences[j] <= hi:
+                    indices.append(j)
+        count = len(indices)
+        if count > 0:
+            acc = sum(correct[j] for j in indices) / count
+            conf = sum(confidences[j] for j in indices) / count
+            ece += (count / n) * abs(acc - conf)
+    return ece
+
+
 def ensemble_predict(model1, model2, loader, device):
     """Ensemble prediction: average softmax of two models, then argmax.
 
-    Requires torch. Returns (predictions, true_labels) as numpy arrays.
+    Requires torch. Returns (predictions, true_labels, probabilities) as
+    numpy arrays. Probabilities has shape (n_samples, n_classes).
     """
     import numpy as np
     import torch
@@ -64,6 +136,7 @@ def ensemble_predict(model1, model2, loader, device):
     model2.eval()
     all_preds = []
     all_labels = []
+    all_probs = []
 
     with torch.no_grad():
         for batch in loader:
@@ -79,8 +152,13 @@ def ensemble_predict(model1, model2, loader, device):
 
             all_preds.append(preds)
             all_labels.append(labels.numpy())
+            all_probs.append(avg_probs.cpu().numpy())
 
-    return np.concatenate(all_preds), np.concatenate(all_labels)
+    return (
+        np.concatenate(all_preds),
+        np.concatenate(all_labels),
+        np.concatenate(all_probs),
+    )
 
 
 def evaluate_pseudo_labels(class_label, predicted_label) -> float:

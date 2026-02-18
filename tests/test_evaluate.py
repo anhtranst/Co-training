@@ -5,7 +5,13 @@ import unittest
 
 sys.path.insert(0, "/workspace")
 
-from lg_cotrain.evaluate import compute_metrics, evaluate_pseudo_labels, _compute_f1_pure
+from lg_cotrain.evaluate import (
+    compute_ece,
+    compute_metrics,
+    evaluate_pseudo_labels,
+    _compute_ece_pure,
+    _compute_f1_pure,
+)
 
 
 class TestComputeMetricsPerfect(unittest.TestCase):
@@ -83,6 +89,82 @@ class TestComputeF1Pure(unittest.TestCase):
         self.assertAlmostEqual(per[0], 2/3, places=4)
         self.assertAlmostEqual(per[1], 0.8, places=4)
         self.assertAlmostEqual(macro, (2/3 + 0.8) / 2, places=4)
+
+
+class TestComputeEce(unittest.TestCase):
+    """Test Expected Calibration Error computation."""
+
+    def test_perfect_calibration(self):
+        """Perfectly calibrated predictions → ECE ≈ 0."""
+        # 2-class, 4 samples: model predicts [1.0, 0.0] for class 0 etc.
+        y_true = [0, 1, 0, 1]
+        y_probs = [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 0.0],
+            [0.0, 1.0],
+        ]
+        ece = compute_ece(y_true, y_probs)
+        self.assertAlmostEqual(ece, 0.0, places=5)
+
+    def test_overconfident_predictions(self):
+        """Overconfident wrong predictions → ECE > 0."""
+        y_true = [0, 0, 0, 0]
+        y_probs = [
+            [0.1, 0.9],  # wrong, confident
+            [0.1, 0.9],  # wrong, confident
+            [0.1, 0.9],  # wrong, confident
+            [0.1, 0.9],  # wrong, confident
+        ]
+        ece = compute_ece(y_true, y_probs)
+        self.assertGreater(ece, 0.5)
+
+    def test_uniform_probabilities(self):
+        """Uniform probabilities: ECE depends on accuracy vs confidence."""
+        y_true = [0, 1]
+        y_probs = [
+            [0.5, 0.5],
+            [0.5, 0.5],
+        ]
+        ece = compute_ece(y_true, y_probs)
+        self.assertGreaterEqual(ece, 0.0)
+        self.assertLessEqual(ece, 1.0)
+
+    def test_single_sample(self):
+        """Single sample edge case."""
+        ece = compute_ece([0], [[0.8, 0.2]])
+        self.assertGreaterEqual(ece, 0.0)
+        self.assertLessEqual(ece, 1.0)
+
+    def test_empty_returns_zero(self):
+        """Empty inputs → ECE = 0."""
+        ece = compute_ece([], [])
+        self.assertAlmostEqual(ece, 0.0)
+
+    def test_returns_float(self):
+        """ECE is a plain float."""
+        ece = compute_ece([0, 1], [[0.7, 0.3], [0.4, 0.6]])
+        self.assertIsInstance(ece, float)
+
+
+class TestComputeEcePure(unittest.TestCase):
+    """Test pure-Python ECE implementation directly."""
+
+    def test_perfect_calibration(self):
+        y_true = [0, 1]
+        y_probs = [[1.0, 0.0], [0.0, 1.0]]
+        ece = _compute_ece_pure(y_true, y_probs)
+        self.assertAlmostEqual(ece, 0.0, places=5)
+
+    def test_overconfident(self):
+        y_true = [0, 0, 0, 0]
+        y_probs = [[0.1, 0.9]] * 4
+        ece = _compute_ece_pure(y_true, y_probs)
+        self.assertGreater(ece, 0.5)
+
+    def test_empty(self):
+        ece = _compute_ece_pure([], [])
+        self.assertAlmostEqual(ece, 0.0)
 
 
 class TestEnsembleAveraging(unittest.TestCase):

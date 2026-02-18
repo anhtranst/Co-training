@@ -136,6 +136,7 @@ class TestNotebookImports(unittest.TestCase):
 
     def test_imports_evaluate(self):
         self.assertIn("from lg_cotrain.evaluate import", self.imports_source)
+        self.assertIn("compute_ece", self.imports_source)
         self.assertIn("compute_metrics", self.imports_source)
         self.assertIn("ensemble_predict", self.imports_source)
 
@@ -217,10 +218,11 @@ class TestNotebookContent(unittest.TestCase):
         self.assertIn("es2.restore_best", phase3_cell)
 
     def test_final_eval_uses_ensemble(self):
-        """Final evaluation uses ensemble_predict."""
+        """Final evaluation uses ensemble_predict and compute_ece."""
         eval_cell = "".join(self.nb["cells"][25]["source"])
         self.assertIn("ensemble_predict", eval_cell)
         self.assertIn("compute_metrics", eval_cell)
+        self.assertIn("compute_ece", eval_cell)
 
     def test_results_saved_to_json(self):
         """Results are saved to metrics.json."""
@@ -229,9 +231,11 @@ class TestNotebookContent(unittest.TestCase):
         self.assertIn("json.dump", save_cell)
         self.assertIn("test_error_rate", save_cell)
         self.assertIn("test_macro_f1", save_cell)
+        self.assertIn("test_ece", save_cell)
         self.assertIn("test_per_class_f1", save_cell)
         self.assertIn("dev_error_rate", save_cell)
         self.assertIn("dev_macro_f1", save_cell)
+        self.assertIn("dev_ece", save_cell)
         self.assertIn("lambda1_mean", save_cell)
         self.assertIn("lambda2_mean", save_cell)
 
@@ -286,8 +290,8 @@ class TestNotebookMatchesTrainer(unittest.TestCase):
         save_cell = "".join(self.nb["cells"][27]["source"])
         required_keys = [
             "event", "budget", "seed_set",
-            "test_error_rate", "test_macro_f1", "test_per_class_f1",
-            "dev_error_rate", "dev_macro_f1",
+            "test_error_rate", "test_macro_f1", "test_ece", "test_per_class_f1",
+            "dev_error_rate", "dev_macro_f1", "dev_ece",
             "lambda1_mean", "lambda1_std",
             "lambda2_mean", "lambda2_std",
         ]

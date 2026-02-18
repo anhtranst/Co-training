@@ -92,6 +92,7 @@ def build_pivot_data(metrics):
             results = groups.get((event, budget), [])
             f1s = [r["test_macro_f1"] for r in results]
             errs = [r["test_error_rate"] for r in results]
+            eces = [r["test_ece"] for r in results if "test_ece" in r]
             entry = {"count": len(results)}
             if len(f1s) >= 2:
                 entry["f1_mean"] = statistics.mean(f1s)
@@ -108,6 +109,16 @@ def build_pivot_data(metrics):
                 entry["f1_std"] = None
                 entry["err_mean"] = None
                 entry["err_std"] = None
+            # ECE (may be absent in older metrics)
+            if len(eces) >= 2:
+                entry["ece_mean"] = statistics.mean(eces)
+                entry["ece_std"] = statistics.stdev(eces)
+            elif len(eces) == 1:
+                entry["ece_mean"] = eces[0]
+                entry["ece_std"] = None
+            else:
+                entry["ece_mean"] = None
+                entry["ece_std"] = None
             pivot[event][budget] = entry
     return pivot
 
@@ -143,23 +154,26 @@ def build_overall_means(pivot):
     for budget in BUDGETS:
         f1_means = []
         err_means = []
+        ece_means = []
         for event in EVENTS:
             entry = pivot[event][budget]
             if entry["f1_mean"] is not None:
                 f1_means.append(entry["f1_mean"])
                 err_means.append(entry["err_mean"])
+            if entry.get("ece_mean") is not None:
+                ece_means.append(entry["ece_mean"])
+        result = {"f1_mean": None, "err_mean": None, "ece_mean": None}
         if f1_means:
-            overall[budget] = {
-                "f1_mean": statistics.mean(f1_means),
-                "err_mean": statistics.mean(err_means),
-            }
-        else:
-            overall[budget] = {"f1_mean": None, "err_mean": None}
+            result["f1_mean"] = statistics.mean(f1_means)
+            result["err_mean"] = statistics.mean(err_means)
+        if ece_means:
+            result["ece_mean"] = statistics.mean(ece_means)
+        overall[budget] = result
     return overall
 
 
 def compute_summary_cards(metrics):
-    """Compute the 4 summary card values."""
+    """Compute the summary card values."""
     total = count_expected_experiments()
     completed = len(metrics)
     pct = (100.0 * completed / total) if total > 0 else 0
@@ -171,6 +185,9 @@ def compute_summary_cards(metrics):
         avg_f1 = None
         avg_err = None
 
+    ece_vals = [m["test_ece"] for m in metrics if "test_ece" in m]
+    avg_ece = statistics.mean(ece_vals) if ece_vals else None
+
     events_with_results = len(set(m["event"] for m in metrics))
 
     return {
@@ -179,6 +196,7 @@ def compute_summary_cards(metrics):
         "pct": pct,
         "avg_f1": avg_f1,
         "avg_err": avg_err,
+        "avg_ece": avg_ece,
         "disasters_done": events_with_results,
         "disasters_total": len(EVENTS),
     }
@@ -299,11 +317,26 @@ def _err_class(val):
     return "cell-vlow"
 
 
-def _fmt_cell(mean, std, fmt):
+def _ece_class(val):
+    """Return CSS class for an ECE value (lower is better)."""
+    if val is None:
+        return "cell-pending"
+    if val < 0.10:
+        return "cell-high"
+    if val < 0.20:
+        return "cell-mid"
+    if val < 0.35:
+        return "cell-low"
+    return "cell-vlow"
+
+
+def _fmt_cell(mean, std, fmt, color_fn=None):
     """Format a pivot cell with optional ±std."""
     if mean is None:
         return '<td class="cell-pending">---</td>'
-    css = _f1_class(mean) if fmt == ".3f" else _err_class(mean)
+    if color_fn is None:
+        color_fn = _f1_class if fmt == ".3f" else _err_class
+    css = color_fn(mean)
     val = f"{mean:{fmt}}"
     if std is not None:
         return f'<td class="{css}">{val} <span class="std">&plusmn;{std:{fmt}}</span></td>'
@@ -404,6 +437,53 @@ def _render_err_table(pivot, overall, event_classes):
 </table></div>"""
 
 
+def _render_ece_table(pivot, overall, event_classes):
+    """Render the ECE pivot table HTML."""
+    rows = []
+    for event in EVENTS:
+        name = format_event_name(event)
+        cls_count = event_classes.get(event, len(CLASS_LABELS))
+        cells = f'<td>{name}</td><td>{cls_count}</td>'
+        row_means = []
+        for budget in BUDGETS:
+            e = pivot[event][budget]
+            cells += _fmt_cell(e.get("ece_mean"), e.get("ece_std"), ".3f", _ece_class)
+            if e.get("ece_mean") is not None:
+                row_means.append(e["ece_mean"])
+        if row_means:
+            rm = statistics.mean(row_means)
+            cells += f'<td class="{_ece_class(rm)}"><b>{rm:.3f}</b></td>'
+        else:
+            cells += '<td class="cell-pending">---</td>'
+        rows.append(f"<tr>{cells}</tr>")
+
+    mean_cells = '<td><b>Mean (all disasters)</b></td><td></td>'
+    all_budget_means = []
+    for budget in BUDGETS:
+        o = overall[budget]
+        if o.get("ece_mean") is not None:
+            mean_cells += f'<td class="{_ece_class(o["ece_mean"])}"><b>{o["ece_mean"]:.3f}</b></td>'
+            all_budget_means.append(o["ece_mean"])
+        else:
+            mean_cells += '<td class="cell-pending">---</td>'
+    if all_budget_means:
+        gm = statistics.mean(all_budget_means)
+        mean_cells += f'<td class="{_ece_class(gm)}"><b>{gm:.3f}</b></td>'
+    else:
+        mean_cells += '<td class="cell-pending">---</td>'
+    rows.append(f'<tr class="mean-row">{mean_cells}</tr>')
+
+    budget_hdrs = "".join(f"<th>{b} / class</th>" for b in BUDGETS)
+    return f"""<div class="table-section">
+<h2>ECE by Disaster &times; Label Size</h2>
+<p class="hint">Expected Calibration Error &middot; lower is better &middot;
+mean &plusmn; std over seed sets</p>
+<table>
+<thead><tr><th>Disaster</th><th>Classes</th>{budget_hdrs}<th>Mean</th></tr></thead>
+<tbody>{"".join(rows)}</tbody>
+</table></div>"""
+
+
 def _render_lambda_table(lambda_pivot, event_classes):
     """Render the Lambda Weights pivot table HTML."""
     rows = []
@@ -457,6 +537,11 @@ def _render_all_results(metrics):
                     err = m["test_error_rate"]
                     f1_cls = _f1_class(f1)
                     err_cls = _err_class(err)
+                    ece = m.get("test_ece")
+                    if ece is not None:
+                        ece_td = f'<td class="{_ece_class(ece)}" data-val="{ece:.6f}">{ece:.3f}</td>'
+                    else:
+                        ece_td = '<td class="cell-pending">---</td>'
                     rows.append(
                         f'<tr>'
                         f'<td>{idx}</td>'
@@ -465,6 +550,7 @@ def _render_all_results(metrics):
                         f'<td data-val="{seed_set}">{seed_set}</td>'
                         f'<td class="{f1_cls}" data-val="{f1:.6f}">{f1:.4f}</td>'
                         f'<td class="{err_cls}" data-val="{err:.4f}">{err:.2f}</td>'
+                        f'{ece_td}'
                         f'<td data-val="{m["dev_macro_f1"]:.6f}">{m["dev_macro_f1"]:.4f}</td>'
                         f'<td data-val="{m["dev_error_rate"]:.4f}">{m["dev_error_rate"]:.2f}</td>'
                         f'<td data-val="{m["lambda1_mean"]:.6f}">{m["lambda1_mean"]:.3f}</td>'
@@ -478,6 +564,7 @@ def _render_all_results(metrics):
                         f'<td>{name}</td>'
                         f'<td>{budget}</td>'
                         f'<td>{seed_set}</td>'
+                        f'<td class="cell-pending">---</td>'
                         f'<td class="cell-pending">---</td>'
                         f'<td class="cell-pending">---</td>'
                         f'<td class="cell-pending">---</td>'
@@ -499,10 +586,11 @@ click column headers to sort</p>
 <th class="sortable" onclick="sortAllTable(3)">Seed</th>
 <th class="sortable" onclick="sortAllTable(4)">Test Macro-F1</th>
 <th class="sortable" onclick="sortAllTable(5)">Test Error %</th>
-<th class="sortable" onclick="sortAllTable(6)">Dev Macro-F1</th>
-<th class="sortable" onclick="sortAllTable(7)">Dev Error %</th>
-<th class="sortable" onclick="sortAllTable(8)">&lambda;<sub>1</sub> mean</th>
-<th class="sortable" onclick="sortAllTable(9)">&lambda;<sub>2</sub> mean</th>
+<th class="sortable" onclick="sortAllTable(6)">Test ECE</th>
+<th class="sortable" onclick="sortAllTable(7)">Dev Macro-F1</th>
+<th class="sortable" onclick="sortAllTable(8)">Dev Error %</th>
+<th class="sortable" onclick="sortAllTable(9)">&lambda;<sub>1</sub> mean</th>
+<th class="sortable" onclick="sortAllTable(10)">&lambda;<sub>2</sub> mean</th>
 </tr></thead>
 <tbody id="all-tbody">{"".join(rows)}</tbody>
 </table></div>"""
@@ -518,11 +606,13 @@ def generate_html(metrics, results_root):
 
     f1_table = _render_f1_table(pivot, overall, event_classes)
     err_table = _render_err_table(pivot, overall, event_classes)
+    ece_table = _render_ece_table(pivot, overall, event_classes)
     lambda_table = _render_lambda_table(lambda_pivot, event_classes)
     all_table = _render_all_results(metrics)
 
     avg_f1_str = f"{summary['avg_f1']:.3f}" if summary["avg_f1"] is not None else "N/A"
     avg_err_str = f"{summary['avg_err']:.2f}" if summary["avg_err"] is not None else "N/A"
+    avg_ece_str = f"{summary['avg_ece']:.3f}" if summary.get("avg_ece") is not None else "N/A"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     return f"""<!DOCTYPE html>
@@ -558,6 +648,11 @@ def generate_html(metrics, results_root):
     <div class="sub">lower is better</div>
   </div>
   <div class="card">
+    <div class="label">Avg ECE</div>
+    <div class="value">{avg_ece_str}</div>
+    <div class="sub">lower is better</div>
+  </div>
+  <div class="card">
     <div class="label">Disasters</div>
     <div class="value">{summary['disasters_done']} / {summary['disasters_total']}</div>
     <div class="sub">&times; {len(BUDGETS)} sizes &times; {len(SEED_SETS)} sets</div>
@@ -580,6 +675,7 @@ def generate_html(metrics, results_root):
   <div id="pivot-view">
     {f1_table}
     {err_table}
+    {ece_table}
     {lambda_table}
   </div>
   <div id="all-view">
