@@ -2,12 +2,20 @@
 
 import argparse
 import json
+import sys
 import statistics
 from datetime import datetime
 from pathlib import Path
 
-from .data_loading import CLASS_LABELS
-from .run_all import BUDGETS, SEED_SETS
+# Support both `python -m lg_cotrain.dashboard` (relative imports)
+# and `python lg_cotrain/dashboard.py` (direct execution on Windows/Linux).
+if __package__ is None or __package__ == "":
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from lg_cotrain.data_loading import CLASS_LABELS
+    from lg_cotrain.run_all import BUDGETS, SEED_SETS
+else:
+    from .data_loading import CLASS_LABELS
+    from .run_all import BUDGETS, SEED_SETS
 
 # Kept for reference / backward compatibility. Dashboard auto-discovers events.
 DEFAULT_EVENTS = [
