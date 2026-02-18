@@ -205,15 +205,13 @@ class LGCoTrainer:
         opt1 = Adam(model1.parameters(), lr=cfg.lr)
         opt2 = Adam(model2.parameters(), lr=cfg.lr)
 
-        # Seed Phase 2 trackers with last Phase 1 probabilities
-        cotrain_tracker1 = WeightTracker(num_dlg)
-        cotrain_tracker2 = WeightTracker(num_dlg)
-        cotrain_tracker1.record_epoch(tracker1.prob_history[-1])
-        cotrain_tracker2.record_epoch(tracker2.prob_history[-1])
-
-        # At epoch 0, variability=0, so lambda1 = lambda2 = confidence
-        lambda1 = cotrain_tracker1.compute_lambda_optimistic()
-        lambda2 = cotrain_tracker2.compute_lambda_conservative()
+        # Seed Phase 2 trackers with FULL Phase 1 probability history so that
+        # initial lambdas retain the confidence/variability split from Phase 1
+        # (per Algorithm 1: compute lambdas from all T weight-gen epochs, then
+        # use those same lambdas as initial co-training weights).
+        cotrain_tracker1 = WeightTracker.seed_from_tracker(tracker1)
+        cotrain_tracker2 = WeightTracker.seed_from_tracker(tracker2)
+        # lambda1 and lambda2 already computed from full Phase 1 history above
 
         for epoch in range(cfg.cotrain_epochs):
             model1.train()

@@ -18,6 +18,9 @@ logger = logging.getLogger("lg_cotrain")
 def run_all_experiments(
     event,
     *,
+    budgets=None,
+    seed_sets=None,
+    pseudo_label_source="gpt-4o",
     model_name="bert-base-uncased",
     weight_gen_epochs=7,
     cotrain_epochs=10,
@@ -33,8 +36,13 @@ def run_all_experiments(
 ):
     """Run all budget x seed_set combinations for *event*.
 
-    Returns a list of 12 result dicts (or ``None`` for failed experiments).
+    Returns a list of result dicts (or ``None`` for failed experiments).
     Experiments whose ``metrics.json`` already exists are loaded and skipped.
+
+    Args:
+        budgets: List of budgets to run. Defaults to BUDGETS ([5, 10, 25, 50]).
+        seed_sets: List of seed sets to run. Defaults to SEED_SETS ([1, 2, 3]).
+        pseudo_label_source: Pseudo-label directory name (default "gpt-4o").
 
     If *_on_experiment_done* is provided, it is called after each experiment
     with ``(event, budget, seed_set, status)`` where *status* is one of
@@ -45,13 +53,16 @@ def run_all_experiments(
 
         _trainer_cls = LGCoTrainer
 
+    budgets = budgets if budgets is not None else BUDGETS
+    seed_sets = seed_sets if seed_sets is not None else SEED_SETS
+
     all_results = []
-    total = len(BUDGETS) * len(SEED_SETS)
+    total = len(budgets) * len(seed_sets)
     completed = skipped = failed = 0
     start_time = time.time()
 
-    for budget in BUDGETS:
-        for seed_set in SEED_SETS:
+    for budget in budgets:
+        for seed_set in seed_sets:
             idx = completed + skipped + failed + 1
             metrics_path = (
                 Path(results_root) / event / f"{budget}_set{seed_set}" / "metrics.json"
@@ -76,6 +87,7 @@ def run_all_experiments(
                 event=event,
                 budget=budget,
                 seed_set=seed_set,
+                pseudo_label_source=pseudo_label_source,
                 model_name=model_name,
                 weight_gen_epochs=weight_gen_epochs,
                 cotrain_epochs=cotrain_epochs,
@@ -125,8 +137,11 @@ def run_all_experiments(
     return all_results
 
 
-def format_summary_table(all_results, event):
+def format_summary_table(all_results, event, budgets=None, seed_sets=None):
     """Return a formatted summary table grouped by budget."""
+    budgets = budgets if budgets is not None else BUDGETS
+    seed_sets = seed_sets if seed_sets is not None else SEED_SETS
+
     # Build lookup: (budget, seed_set) -> result dict
     lookup = {}
     for r in all_results:
@@ -138,18 +153,18 @@ def format_summary_table(all_results, event):
     lines.append("")
 
     # Header
-    seed_hdrs = "".join(f"  Seed {s:<13}" for s in SEED_SETS)
+    seed_hdrs = "".join(f"  Seed {s:<13}" for s in seed_sets)
     lines.append(f"{'Budget':>6}  {seed_hdrs}  {'Mean':>8}  {'Std':>8}")
 
-    sub_cells = "".join(f"  {'ErrR%':>6} {'MacF1':>6}" for _ in SEED_SETS)
+    sub_cells = "".join(f"  {'ErrR%':>6} {'MacF1':>6}" for _ in seed_sets)
     lines.append(f"{'':>6}  {sub_cells}  {'ErrR%':>8}  {'MacF1':>8}")
     lines.append("-" * len(lines[-1]))
 
-    for budget in BUDGETS:
+    for budget in budgets:
         err_rates = []
         macro_f1s = []
         cells = ""
-        for seed_set in SEED_SETS:
+        for seed_set in seed_sets:
             r = lookup.get((budget, seed_set))
             if r is not None:
                 cells += f"  {r['test_error_rate']:>6.2f} {r['test_macro_f1']:>6.4f}"
@@ -177,11 +192,23 @@ def format_summary_table(all_results, event):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run all 12 (budget x seed_set) experiments for one event"
+        description="Run all (budget x seed_set) experiments for one event"
     )
     parser.add_argument(
         "--event", type=str, required=True,
         help="Disaster event name, e.g. canada_wildfires_2016",
+    )
+    parser.add_argument(
+        "--budgets", type=int, nargs="*", default=None,
+        help="Budgets to run (default: all [5, 10, 25, 50])",
+    )
+    parser.add_argument(
+        "--seed-sets", type=int, nargs="*", default=None,
+        help="Seed sets to run (default: all [1, 2, 3])",
+    )
+    parser.add_argument(
+        "--pseudo-label-source", type=str, default="gpt-4o",
+        help="Pseudo-label directory name (default: gpt-4o)",
     )
     parser.add_argument("--model-name", type=str, default="bert-base-uncased")
     parser.add_argument("--weight-gen-epochs", type=int, default=7)
@@ -198,6 +225,9 @@ def main():
 
     all_results = run_all_experiments(
         args.event,
+        budgets=args.budgets,
+        seed_sets=args.seed_sets,
+        pseudo_label_source=args.pseudo_label_source,
         model_name=args.model_name,
         weight_gen_epochs=args.weight_gen_epochs,
         cotrain_epochs=args.cotrain_epochs,
@@ -211,7 +241,8 @@ def main():
     )
 
     print()
-    print(format_summary_table(all_results, args.event))
+    print(format_summary_table(all_results, args.event,
+                               budgets=args.budgets, seed_sets=args.seed_sets))
 
 
 if __name__ == "__main__":

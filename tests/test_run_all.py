@@ -274,6 +274,121 @@ class TestRunAllCLI(unittest.TestCase):
                 self.assertEqual(kwargs["cotrain_epochs"], 5)
 
 
+class TestCustomBudgetsAndSeedSets(unittest.TestCase):
+    """Tests for the budgets and seed_sets parameters."""
+
+    def test_custom_budgets_subset(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        seen = []
+
+        def tracking_cls(config):
+            seen.append((config.budget, config.seed_set))
+            return _fake_trainer_cls(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results = run_all_experiments(
+                "test_event",
+                budgets=[5, 10],
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=tracking_cls,
+            )
+
+        self.assertEqual(len(results), 6)  # 2 budgets x 3 seeds
+        budgets_seen = set(b for b, s in seen)
+        self.assertEqual(budgets_seen, {5, 10})
+
+    def test_custom_seed_sets_subset(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        seen = []
+
+        def tracking_cls(config):
+            seen.append((config.budget, config.seed_set))
+            return _fake_trainer_cls(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results = run_all_experiments(
+                "test_event",
+                seed_sets=[1],
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=tracking_cls,
+            )
+
+        self.assertEqual(len(results), 4)  # 4 budgets x 1 seed
+        seeds_seen = set(s for b, s in seen)
+        self.assertEqual(seeds_seen, {1})
+
+    def test_single_budget_single_seed(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        seen = []
+
+        def tracking_cls(config):
+            seen.append((config.budget, config.seed_set))
+            return _fake_trainer_cls(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results = run_all_experiments(
+                "test_event",
+                budgets=[25],
+                seed_sets=[2],
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=tracking_cls,
+            )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(seen, [(25, 2)])
+
+    def test_none_defaults_to_all(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        seen = []
+
+        def tracking_cls(config):
+            seen.append((config.budget, config.seed_set))
+            return _fake_trainer_cls(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results = run_all_experiments(
+                "test_event",
+                budgets=None,
+                seed_sets=None,
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=tracking_cls,
+            )
+
+        self.assertEqual(len(results), 12)
+
+    def test_pseudo_label_source_forwarded(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        configs_seen = []
+
+        def capturing_cls(config):
+            configs_seen.append(config)
+            return _fake_trainer_cls(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_all_experiments(
+                "test_event",
+                pseudo_label_source="llama-3",
+                budgets=[5],
+                seed_sets=[1],
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=capturing_cls,
+            )
+
+        self.assertEqual(len(configs_seen), 1)
+        self.assertEqual(configs_seen[0].pseudo_label_source, "llama-3")
+        self.assertIn("llama-3", configs_seen[0].pseudo_label_path)
+
+
 class TestOnExperimentDoneCallback(unittest.TestCase):
     """Tests for the _on_experiment_done callback parameter."""
 

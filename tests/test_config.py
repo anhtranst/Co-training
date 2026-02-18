@@ -107,6 +107,43 @@ class TestConfigVariousEvents(unittest.TestCase):
         self.assertEqual(cfg1.pseudo_label_path, cfg2.pseudo_label_path)
 
 
+class TestConfigPseudoLabelSource(unittest.TestCase):
+    """Tests for the configurable pseudo_label_source field."""
+
+    def test_default_is_gpt4o(self):
+        cfg = LGCoTrainConfig()
+        self.assertEqual(cfg.pseudo_label_source, "gpt-4o")
+
+    def test_default_path_contains_gpt4o(self):
+        cfg = LGCoTrainConfig()
+        self.assertIn("gpt-4o", cfg.pseudo_label_path)
+
+    def test_custom_source_changes_path(self):
+        cfg = LGCoTrainConfig(pseudo_label_source="llama-3")
+        self.assertIn("llama-3", cfg.pseudo_label_path)
+        self.assertNotIn("gpt-4o", cfg.pseudo_label_path)
+
+    def test_custom_source_preserves_event_and_filename(self):
+        cfg = LGCoTrainConfig(
+            event="canada_wildfires_2016", pseudo_label_source="llama-3"
+        )
+        self.assertIn("canada_wildfires_2016", cfg.pseudo_label_path)
+        self.assertTrue(
+            cfg.pseudo_label_path.endswith("canada_wildfires_2016_train_pred.csv")
+        )
+
+    def test_source_independent_of_budget_and_seed(self):
+        cfg1 = LGCoTrainConfig(
+            event="canada_wildfires_2016", budget=5, seed_set=1,
+            pseudo_label_source="custom-model",
+        )
+        cfg2 = LGCoTrainConfig(
+            event="canada_wildfires_2016", budget=50, seed_set=3,
+            pseudo_label_source="custom-model",
+        )
+        self.assertEqual(cfg1.pseudo_label_path, cfg2.pseudo_label_path)
+
+
 class TestConfigCustomRoots(unittest.TestCase):
     """Custom data_root and results_root."""
 

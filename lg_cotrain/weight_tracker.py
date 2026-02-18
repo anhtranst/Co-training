@@ -82,6 +82,22 @@ class WeightTracker:
             return np.clip(c - v, a_min=0, a_max=None)
         return [max(ci - vi, 0.0) for ci, vi in zip(c, v)]
 
+    @classmethod
+    def seed_from_tracker(cls, source: "WeightTracker") -> "WeightTracker":
+        """Create a new tracker pre-seeded with another tracker's full history.
+
+        Used to carry Phase 1 probability history into Phase 2, so that
+        initial lambda weights retain the confidence/variability split
+        computed across all Phase 1 epochs (per Algorithm 1 in the paper).
+        """
+        new_tracker = cls(source.num_samples)
+        for probs in source.prob_history:
+            if HAS_NUMPY and isinstance(probs, np.ndarray):
+                new_tracker.prob_history.append(probs.copy())
+            else:
+                new_tracker.prob_history.append(list(probs))
+        return new_tracker
+
     @property
     def num_epochs_recorded(self) -> int:
         return len(self.prob_history)

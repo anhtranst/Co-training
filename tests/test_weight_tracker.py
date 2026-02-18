@@ -165,5 +165,90 @@ class TestWeightTrackerBookkeeping(unittest.TestCase):
         self.assertAlmostEqual(tracker.compute_confidence()[0], 0.5, places=6)
 
 
+class TestWeightTrackerSeedFromTracker(unittest.TestCase):
+    """Test the seed_from_tracker classmethod."""
+
+    def test_seeded_tracker_has_same_num_samples(self):
+        source = WeightTracker(num_samples=5)
+        source.record_epoch([0.8, 0.6, 0.7, 0.9, 0.5])
+        seeded = WeightTracker.seed_from_tracker(source)
+        self.assertEqual(seeded.num_samples, 5)
+
+    def test_seeded_tracker_has_same_epoch_count(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        source.record_epoch([0.7, 0.5, 0.8])
+        seeded = WeightTracker.seed_from_tracker(source)
+        self.assertEqual(seeded.num_epochs_recorded, 3)
+
+    def test_seeded_tracker_computes_same_confidence(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_tracker(source)
+        src_conf = source.compute_confidence()
+        seed_conf = seeded.compute_confidence()
+        for a, b in zip(src_conf, seed_conf):
+            self.assertAlmostEqual(a, b, places=6)
+
+    def test_seeded_tracker_computes_same_variability(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_tracker(source)
+        src_var = source.compute_variability()
+        seed_var = seeded.compute_variability()
+        for a, b in zip(src_var, seed_var):
+            self.assertAlmostEqual(a, b, places=6)
+
+    def test_seeded_tracker_computes_same_lambdas(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_tracker(source)
+        src_l1 = source.compute_lambda_optimistic()
+        src_l2 = source.compute_lambda_conservative()
+        seed_l1 = seeded.compute_lambda_optimistic()
+        seed_l2 = seeded.compute_lambda_conservative()
+        for a, b in zip(src_l1, seed_l1):
+            self.assertAlmostEqual(a, b, places=6)
+        for a, b in zip(src_l2, seed_l2):
+            self.assertAlmostEqual(a, b, places=6)
+
+    def test_seeded_tracker_is_independent_of_source(self):
+        """Appending to the seeded tracker does not affect the source."""
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.5])
+        source.record_epoch([0.7, 0.3])
+        seeded = WeightTracker.seed_from_tracker(source)
+        seeded.record_epoch([0.9, 0.1])
+        self.assertEqual(source.num_epochs_recorded, 2)
+        self.assertEqual(seeded.num_epochs_recorded, 3)
+
+    def test_seeded_tracker_data_is_deep_copy(self):
+        """Mutating seeded history does not affect source history."""
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.6])
+        seeded = WeightTracker.seed_from_tracker(source)
+        seeded.prob_history[0][0] = 999.0
+        self.assertAlmostEqual(source.prob_history[0][0], 0.5, places=6)
+
+    def test_variability_gt_zero_with_multi_epoch_source(self):
+        """Key invariant: seeding from multi-epoch source preserves variability > 0."""
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_tracker(source)
+        var = seeded.compute_variability()
+        for v in var:
+            self.assertGreater(v, 0.0)
+        # Therefore lambda_optimistic != lambda_conservative
+        l1 = seeded.compute_lambda_optimistic()
+        l2 = seeded.compute_lambda_conservative()
+        any_different = any(abs(a - b) > 1e-9 for a, b in zip(l1, l2))
+        self.assertTrue(any_different, "lambda1 and lambda2 should differ")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

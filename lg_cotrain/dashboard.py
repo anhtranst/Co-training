@@ -9,7 +9,8 @@ from pathlib import Path
 from .data_loading import CLASS_LABELS
 from .run_all import BUDGETS, SEED_SETS
 
-EVENTS = [
+# Kept for reference / backward compatibility. Dashboard auto-discovers events.
+DEFAULT_EVENTS = [
     "california_wildfires_2018",
     "canada_wildfires_2016",
     "cyclone_idai_2019",
@@ -22,45 +23,81 @@ EVENTS = [
     "kerala_floods_2018",
 ]
 
+# Keep old name as alias for backward compatibility
+EVENTS = DEFAULT_EVENTS
+
 
 def format_event_name(event):
     """Convert 'california_wildfires_2018' to 'California Wildfires 2018'."""
     return event.replace("_", " ").title()
 
 
-def collect_all_metrics(results_root):
-    """Scan results_root for all metrics.json files and return list of dicts.
+def discover_events(metrics):
+    """Extract sorted unique event names from metrics data."""
+    return sorted(set(m["event"] for m in metrics))
 
-    Silently skips missing or malformed files.
+
+def _has_metrics(path):
+    """Check if *path* contains at least one metrics.json at expected depth."""
+    return any(Path(path).glob("*/*/metrics.json"))
+
+
+def discover_result_sets(results_root):
+    """Discover result set sub-folders under *results_root*.
+
+    Returns list of ``(name, path)`` tuples. If the root itself contains
+    event directories with ``metrics.json`` (legacy flat layout), it is
+    included as the "default" result set.
+    """
+    root = Path(results_root)
+    result_sets = []
+
+    # Check if root itself has the legacy flat layout
+    if _has_metrics(root):
+        result_sets.append(("default", str(root)))
+
+    # Check sub-folders
+    if root.is_dir():
+        for child in sorted(root.iterdir()):
+            if child.is_dir() and child.name != "__pycache__":
+                if _has_metrics(child):
+                    result_sets.append((child.name, str(child)))
+
+    return result_sets if result_sets else [("default", str(root))]
+
+
+def collect_all_metrics(results_root):
+    """Scan *results_root* for all metrics.json files, auto-discovering events.
+
+    Silently skips malformed files.
     """
     metrics = []
     root = Path(results_root)
-    for event in EVENTS:
-        for budget in BUDGETS:
-            for seed_set in SEED_SETS:
-                path = root / event / f"{budget}_set{seed_set}" / "metrics.json"
-                if not path.exists():
-                    continue
-                try:
-                    with open(path) as f:
-                        data = json.load(f)
-                    metrics.append(data)
-                except (json.JSONDecodeError, OSError):
-                    continue
+    for metrics_file in sorted(root.glob("*/*/metrics.json")):
+        try:
+            with open(metrics_file) as f:
+                data = json.load(f)
+            metrics.append(data)
+        except (json.JSONDecodeError, OSError):
+            continue
     return metrics
 
 
-def count_expected_experiments():
-    """Return total expected: len(EVENTS) * len(BUDGETS) * len(SEED_SETS)."""
-    return len(EVENTS) * len(BUDGETS) * len(SEED_SETS)
+def count_expected_experiments(events=None):
+    """Return total expected: len(events) * len(BUDGETS) * len(SEED_SETS)."""
+    if events is None:
+        events = DEFAULT_EVENTS
+    return len(events) * len(BUDGETS) * len(SEED_SETS)
 
 
-def get_event_class_count(metrics):
+def get_event_class_count(metrics, events=None):
     """Derive class count per event from len(test_per_class_f1).
 
     Returns dict {event: int}. Defaults to len(CLASS_LABELS) for events
     with no results.
     """
+    if events is None:
+        events = discover_events(metrics) or DEFAULT_EVENTS
     counts = {}
     for m in metrics:
         event = m["event"]
@@ -68,17 +105,19 @@ def get_event_class_count(metrics):
             per_class = m.get("test_per_class_f1", [])
             counts[event] = len(per_class) if per_class else len(CLASS_LABELS)
     # Fill in missing events
-    for event in EVENTS:
+    for event in events:
         if event not in counts:
             counts[event] = len(CLASS_LABELS)
     return counts
 
 
-def build_pivot_data(metrics):
+def build_pivot_data(metrics, events=None):
     """Build pivot: {event: {budget: {f1_mean, f1_std, err_mean, err_std, count}}}.
 
     Groups by (event, budget), computes mean/std across seed sets.
     """
+    if events is None:
+        events = discover_events(metrics) or DEFAULT_EVENTS
     # Group
     groups = {}
     for m in metrics:
@@ -86,7 +125,7 @@ def build_pivot_data(metrics):
         groups.setdefault(key, []).append(m)
 
     pivot = {}
-    for event in EVENTS:
+    for event in events:
         pivot[event] = {}
         for budget in BUDGETS:
             results = groups.get((event, budget), [])
@@ -123,15 +162,17 @@ def build_pivot_data(metrics):
     return pivot
 
 
-def build_lambda_pivot(metrics):
+def build_lambda_pivot(metrics, events=None):
     """Build lambda weight pivot: {event: {budget: {l1_mean, l2_mean, count}}}."""
+    if events is None:
+        events = discover_events(metrics) or DEFAULT_EVENTS
     groups = {}
     for m in metrics:
         key = (m["event"], m["budget"])
         groups.setdefault(key, []).append(m)
 
     pivot = {}
-    for event in EVENTS:
+    for event in events:
         pivot[event] = {}
         for budget in BUDGETS:
             results = groups.get((event, budget), [])
@@ -148,16 +189,18 @@ def build_lambda_pivot(metrics):
     return pivot
 
 
-def build_overall_means(pivot):
+def build_overall_means(pivot, events=None):
     """Compute 'Mean (all disasters)' row: average across events per budget."""
+    if events is None:
+        events = list(pivot.keys())
     overall = {}
     for budget in BUDGETS:
         f1_means = []
         err_means = []
         ece_means = []
-        for event in EVENTS:
-            entry = pivot[event][budget]
-            if entry["f1_mean"] is not None:
+        for event in events:
+            entry = pivot.get(event, {}).get(budget, {})
+            if entry.get("f1_mean") is not None:
                 f1_means.append(entry["f1_mean"])
                 err_means.append(entry["err_mean"])
             if entry.get("ece_mean") is not None:
@@ -172,9 +215,11 @@ def build_overall_means(pivot):
     return overall
 
 
-def compute_summary_cards(metrics):
+def compute_summary_cards(metrics, events=None):
     """Compute the summary card values."""
-    total = count_expected_experiments()
+    if events is None:
+        events = discover_events(metrics) or DEFAULT_EVENTS
+    total = count_expected_experiments(events)
     completed = len(metrics)
     pct = (100.0 * completed / total) if total > 0 else 0
 
@@ -198,7 +243,7 @@ def compute_summary_cards(metrics):
         "avg_err": avg_err,
         "avg_ece": avg_ece,
         "disasters_done": events_with_results,
-        "disasters_total": len(EVENTS),
+        "disasters_total": len(events),
     }
 
 
@@ -214,6 +259,16 @@ header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
          color: #e8e8e8; padding: 28px 40px; }
 header h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
 header p { font-size: 13px; opacity: 0.7; }
+.tab-bar { display: flex; gap: 0; padding: 0 40px; background: #1a1a2e;
+           border-bottom: 2px solid #2d3adf; overflow-x: auto; }
+.tab-bar .tab { padding: 12px 24px; cursor: pointer; font-size: 14px;
+                font-weight: 600; background: transparent; border: none;
+                color: #8888aa; transition: all 0.15s; white-space: nowrap; }
+.tab-bar .tab.active { color: #fff; border-bottom: 3px solid #2d3adf;
+                       background: rgba(45,58,223,0.1); }
+.tab-bar .tab:hover:not(.active) { color: #bbb; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 .cards { display: flex; gap: 20px; padding: 24px 40px; flex-wrap: wrap; }
 .card { background: #fff; border: 1px solid #dee2e6; border-radius: 10px;
         padding: 20px 28px; min-width: 180px; flex: 1; }
@@ -262,29 +317,50 @@ tr.mean-row td { background: #f8f9ff; }
 .sortable:hover { background: #2a2a4e; }
 .sortable::after { content: ' \\2195'; opacity: 0.4; }
 footer { text-align: center; padding: 20px; font-size: 12px; color: #b2bec3; }
-#all-view { display: none; }
 """
 
 _JS = """\
-function showView(v) {
-    document.getElementById('pivot-view').style.display = v === 'pivot' ? 'block' : 'none';
-    document.getElementById('all-view').style.display = v === 'all' ? 'block' : 'none';
-    document.querySelectorAll('.toggle-btn').forEach(function(b) {
+function showTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-bar .tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    var el = document.getElementById('tab-' + tabId);
+    if (el) { el.classList.add('active'); }
+    var btn = document.querySelector('.tab-bar .tab[data-tab="' + tabId + '"]');
+    if (btn) { btn.classList.add('active'); }
+    showView(tabId, 'pivot');
+}
+
+function showView(tabId, v) {
+    var tab = document.getElementById('tab-' + tabId);
+    if (!tab) return;
+    var pivotEl = tab.querySelector('.pivot-view');
+    var allEl = tab.querySelector('.all-view');
+    if (pivotEl) pivotEl.style.display = v === 'pivot' ? 'block' : 'none';
+    if (allEl) allEl.style.display = v === 'all' ? 'block' : 'none';
+    tab.querySelectorAll('.toggle-btn').forEach(function(b) {
         b.classList.toggle('active', b.dataset.view === v);
     });
 }
 
-var sortCol = null, sortAsc = true;
-function sortAllTable(col) {
-    var tbody = document.getElementById('all-tbody');
+var sortState = {};
+function sortAllTable(tabId, col) {
+    var key = tabId + '-' + col;
+    var tbody = document.getElementById('all-tbody-' + tabId);
+    if (!tbody) return;
     var rows = Array.from(tbody.querySelectorAll('tr'));
-    if (sortCol === col) { sortAsc = !sortAsc; } else { sortCol = col; sortAsc = true; }
+    if (sortState[key]) { sortState[key] = !sortState[key]; }
+    else { sortState[key] = true; }
+    var asc = sortState[key];
     rows.sort(function(a, b) {
         var va = a.cells[col].getAttribute('data-val') || a.cells[col].textContent;
         var vb = b.cells[col].getAttribute('data-val') || b.cells[col].textContent;
         var na = parseFloat(va), nb = parseFloat(vb);
-        if (!isNaN(na) && !isNaN(nb)) { return sortAsc ? na - nb : nb - na; }
-        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        if (!isNaN(na) && !isNaN(nb)) { return asc ? na - nb : nb - na; }
+        return asc ? va.localeCompare(vb) : vb.localeCompare(va);
     });
     rows.forEach(function(r) { tbody.appendChild(r); });
 }
@@ -331,7 +407,7 @@ def _ece_class(val):
 
 
 def _fmt_cell(mean, std, fmt, color_fn=None):
-    """Format a pivot cell with optional ±std."""
+    """Format a pivot cell with optional +/-std."""
     if mean is None:
         return '<td class="cell-pending">---</td>'
     if color_fn is None:
@@ -343,10 +419,10 @@ def _fmt_cell(mean, std, fmt, color_fn=None):
     return f'<td class="{css}">{val}</td>'
 
 
-def _render_f1_table(pivot, overall, event_classes):
+def _render_f1_table(pivot, overall, event_classes, events):
     """Render the Macro-F1 pivot table HTML."""
     rows = []
-    for event in EVENTS:
+    for event in events:
         name = format_event_name(event)
         cls_count = event_classes.get(event, len(CLASS_LABELS))
         cells = f'<td>{name}</td><td>{cls_count}</td>'
@@ -391,10 +467,10 @@ def _render_f1_table(pivot, overall, event_classes):
 </table></div>"""
 
 
-def _render_err_table(pivot, overall, event_classes):
+def _render_err_table(pivot, overall, event_classes, events):
     """Render the Error Rate pivot table HTML."""
     rows = []
-    for event in EVENTS:
+    for event in events:
         name = format_event_name(event)
         cls_count = event_classes.get(event, len(CLASS_LABELS))
         cells = f'<td>{name}</td><td>{cls_count}</td>'
@@ -437,10 +513,10 @@ def _render_err_table(pivot, overall, event_classes):
 </table></div>"""
 
 
-def _render_ece_table(pivot, overall, event_classes):
+def _render_ece_table(pivot, overall, event_classes, events):
     """Render the ECE pivot table HTML."""
     rows = []
-    for event in EVENTS:
+    for event in events:
         name = format_event_name(event)
         cls_count = event_classes.get(event, len(CLASS_LABELS))
         cells = f'<td>{name}</td><td>{cls_count}</td>'
@@ -484,10 +560,10 @@ mean &plusmn; std over seed sets</p>
 </table></div>"""
 
 
-def _render_lambda_table(lambda_pivot, event_classes):
+def _render_lambda_table(lambda_pivot, event_classes, events):
     """Render the Lambda Weights pivot table HTML."""
     rows = []
-    for event in EVENTS:
+    for event in events:
         name = format_event_name(event)
         cls_count = event_classes.get(event, len(CLASS_LABELS))
         cells = f'<td>{name}</td><td>{cls_count}</td>'
@@ -517,7 +593,7 @@ mean across seed sets</p>
 </table></div>"""
 
 
-def _render_all_results(metrics):
+def _render_all_results(metrics, events, tab_id="default"):
     """Render the All Results flat table HTML."""
     # Build lookup for quick access
     lookup = {}
@@ -526,7 +602,7 @@ def _render_all_results(metrics):
 
     rows = []
     idx = 0
-    for event in EVENTS:
+    for event in events:
         for budget in BUDGETS:
             for seed_set in SEED_SETS:
                 idx += 1
@@ -574,63 +650,52 @@ def _render_all_results(metrics):
                         f'</tr>'
                     )
 
+    total = count_expected_experiments(events)
+    esc_tab = tab_id.replace('"', '&quot;')
     return f"""<div class="table-section">
 <h2>All Experiment Results</h2>
-<p class="hint">Showing {len(metrics)} of {count_expected_experiments()} experiments &middot;
+<p class="hint">Showing {len(metrics)} of {total} experiments &middot;
 click column headers to sort</p>
 <table>
 <thead><tr>
-<th class="sortable" onclick="sortAllTable(0)">#</th>
-<th class="sortable" onclick="sortAllTable(1)">Event</th>
-<th class="sortable" onclick="sortAllTable(2)">Budget</th>
-<th class="sortable" onclick="sortAllTable(3)">Seed</th>
-<th class="sortable" onclick="sortAllTable(4)">Test Macro-F1</th>
-<th class="sortable" onclick="sortAllTable(5)">Test Error %</th>
-<th class="sortable" onclick="sortAllTable(6)">Test ECE</th>
-<th class="sortable" onclick="sortAllTable(7)">Dev Macro-F1</th>
-<th class="sortable" onclick="sortAllTable(8)">Dev Error %</th>
-<th class="sortable" onclick="sortAllTable(9)">&lambda;<sub>1</sub> mean</th>
-<th class="sortable" onclick="sortAllTable(10)">&lambda;<sub>2</sub> mean</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',0)">#</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',1)">Event</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',2)">Budget</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',3)">Seed</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',4)">Test Macro-F1</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',5)">Test Error %</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',6)">Test ECE</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',7)">Dev Macro-F1</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',8)">Dev Error %</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',9)">&lambda;<sub>1</sub> mean</th>
+<th class="sortable" onclick="sortAllTable('{esc_tab}',10)">&lambda;<sub>2</sub> mean</th>
 </tr></thead>
-<tbody id="all-tbody">{"".join(rows)}</tbody>
+<tbody id="all-tbody-{esc_tab}">{"".join(rows)}</tbody>
 </table></div>"""
 
 
-def generate_html(metrics, results_root):
-    """Generate complete self-contained HTML dashboard string."""
-    pivot = build_pivot_data(metrics)
-    overall = build_overall_means(pivot)
-    lambda_pivot = build_lambda_pivot(metrics)
-    summary = compute_summary_cards(metrics)
-    event_classes = get_event_class_count(metrics)
+def _render_tab_content(metrics, results_root, tab_id="default"):
+    """Render the full dashboard body for a single result set / tab."""
+    events = discover_events(metrics) or DEFAULT_EVENTS
+    pivot = build_pivot_data(metrics, events)
+    overall = build_overall_means(pivot, events)
+    lambda_pivot = build_lambda_pivot(metrics, events)
+    summary = compute_summary_cards(metrics, events)
+    event_classes = get_event_class_count(metrics, events)
 
-    f1_table = _render_f1_table(pivot, overall, event_classes)
-    err_table = _render_err_table(pivot, overall, event_classes)
-    ece_table = _render_ece_table(pivot, overall, event_classes)
-    lambda_table = _render_lambda_table(lambda_pivot, event_classes)
-    all_table = _render_all_results(metrics)
+    f1_table = _render_f1_table(pivot, overall, event_classes, events)
+    err_table = _render_err_table(pivot, overall, event_classes, events)
+    ece_table = _render_ece_table(pivot, overall, event_classes, events)
+    lambda_table = _render_lambda_table(lambda_pivot, event_classes, events)
+    all_table = _render_all_results(metrics, events, tab_id)
 
     avg_f1_str = f"{summary['avg_f1']:.3f}" if summary["avg_f1"] is not None else "N/A"
     avg_err_str = f"{summary['avg_err']:.2f}" if summary["avg_err"] is not None else "N/A"
     avg_ece_str = f"{summary['avg_ece']:.3f}" if summary.get("avg_ece") is not None else "N/A"
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LG-CoTrain Results Dashboard</title>
-<style>{_CSS}</style>
-</head>
-<body>
+    esc_tab = tab_id.replace('"', '&quot;')
 
-<header>
-<h1>LG-CoTrain &mdash; Results Dashboard</h1>
-<p>Semi-supervised co-training &middot; BERT &middot; HumAID dataset &middot;
-{summary['disasters_total']} disasters &times; {len(BUDGETS) * len(SEED_SETS)} splits</p>
-</header>
-
+    return f"""
 <div class="cards">
   <div class="card">
     <div class="label">Experiments</div>
@@ -661,8 +726,8 @@ def generate_html(metrics, results_root):
 
 <div class="controls">
   <div class="toggle-group">
-    <button class="toggle-btn active" data-view="pivot" onclick="showView('pivot')">Pivot Summary</button>
-    <button class="toggle-btn" data-view="all" onclick="showView('all')">All Results</button>
+    <button class="toggle-btn active" data-view="pivot" onclick="showView('{esc_tab}','pivot')">Pivot Summary</button>
+    <button class="toggle-btn" data-view="all" onclick="showView('{esc_tab}','all')">All Results</button>
   </div>
   <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:#28a745"></div> High F1 / Low Err</div>
@@ -672,16 +737,103 @@ def generate_html(metrics, results_root):
 </div>
 
 <div class="content">
-  <div id="pivot-view">
+  <div class="pivot-view">
     {f1_table}
     {err_table}
     {ece_table}
     {lambda_table}
   </div>
-  <div id="all-view">
+  <div class="all-view" style="display:none">
     {all_table}
   </div>
+</div>"""
+
+
+def generate_html(metrics, results_root):
+    """Generate complete self-contained HTML dashboard string (single result set)."""
+    events = discover_events(metrics) or DEFAULT_EVENTS
+    summary = compute_summary_cards(metrics, events)
+    tab_content = _render_tab_content(metrics, results_root, "default")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LG-CoTrain Results Dashboard</title>
+<style>{_CSS}</style>
+</head>
+<body>
+
+<header>
+<h1>LG-CoTrain &mdash; Results Dashboard</h1>
+<p>Semi-supervised co-training &middot; BERT &middot; HumAID dataset &middot;
+{summary['disasters_total']} disasters &times; {len(BUDGETS) * len(SEED_SETS)} splits</p>
+</header>
+
+<div id="tab-default" class="tab-content active">
+{tab_content}
 </div>
+
+<footer>Generated at {timestamp}</footer>
+
+<script>{_JS}</script>
+</body>
+</html>"""
+
+
+def generate_html_multi(result_sets):
+    """Generate multi-tab HTML dashboard from multiple result sets.
+
+    Args:
+        result_sets: list of (name, path) tuples from discover_result_sets.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Build tab bar
+    tab_buttons = []
+    tab_divs = []
+    for i, (name, path) in enumerate(result_sets):
+        active = " active" if i == 0 else ""
+        esc_name = name.replace('"', '&quot;')
+        tab_buttons.append(
+            f'<button class="tab{active}" data-tab="{esc_name}" '
+            f"onclick=\"showTab('{esc_name}')\">{name}</button>"
+        )
+
+        metrics = collect_all_metrics(path)
+        content = _render_tab_content(metrics, path, name)
+        tab_divs.append(
+            f'<div id="tab-{esc_name}" class="tab-content{active}">\n{content}\n</div>'
+        )
+
+    tab_bar_html = f'<nav class="tab-bar">{"".join(tab_buttons)}</nav>'
+
+    # Compute a global summary for the header subtitle
+    total_metrics = sum(
+        len(collect_all_metrics(path)) for _, path in result_sets
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LG-CoTrain Results Dashboard</title>
+<style>{_CSS}</style>
+</head>
+<body>
+
+<header>
+<h1>LG-CoTrain &mdash; Results Dashboard</h1>
+<p>Semi-supervised co-training &middot; BERT &middot; HumAID dataset &middot;
+{len(result_sets)} result sets &middot; {total_metrics} total experiments</p>
+</header>
+
+{tab_bar_html}
+
+{"".join(tab_divs)}
 
 <footer>Generated at {timestamp}</footer>
 
@@ -715,12 +867,22 @@ def main():
     args = parser.parse_args()
 
     output = args.output or str(Path(args.results_root) / "dashboard.html")
-    metrics = collect_all_metrics(args.results_root)
-    html = generate_html(metrics, args.results_root)
+    result_sets = discover_result_sets(args.results_root)
+
+    if len(result_sets) == 1:
+        # Single result set: use single-page generation
+        name, path = result_sets[0]
+        metrics = collect_all_metrics(path)
+        html = generate_html(metrics, path)
+        total = len(metrics)
+    else:
+        # Multiple result sets: use multi-tab generation
+        html = generate_html_multi(result_sets)
+        total = sum(len(collect_all_metrics(p)) for _, p in result_sets)
 
     Path(output).write_text(html)
     print(f"Dashboard written to {output}")
-    print(f"  {len(metrics)}/{count_expected_experiments()} experiments found")
+    print(f"  {len(result_sets)} result set(s), {total} total experiments")
 
 
 if __name__ == "__main__":

@@ -68,6 +68,16 @@ pip install -r lg_cotrain/requirements.txt
 - `LGCoTrainConfig` auto-computes all file paths in `__post_init__` from `event`, `budget`, `seed_set`, `data_root`, and `results_root`
 - Results are saved to `results/{event}/{budget}_set{seed}/metrics.json`
 
+### Paper vs Implementation Deviations
+
+Documented differences between Algorithm 1 in the paper (`docs/Cornelia etal2025-Cotraining.pdf`) and this implementation:
+
+- **Per-epoch lambda updates**: The paper's pseudocode (Algorithm 1, lines 24-28) shows updating confidence, variability, and lambdas for each mini-batch during Phase 2 co-training. This implementation updates lambdas once per epoch via a full evaluation pass over D_LG (`trainer.py` lines 261-267). Per-epoch updates are more computationally stable and are standard practice in semi-supervised learning.
+
+- **Lambda-conservative clipping**: The paper's Eq. 4 defines `λ2_i = c_θ2 - v_θ2` without explicit clipping. This implementation clips to `max(c - v, 0)` (`weight_tracker.py` `compute_lambda_conservative`). Negative weights would invert the loss gradient, encouraging the model toward incorrect predictions. Clipping to zero effectively excludes low-confidence, high-variability samples.
+
+- **Early stopping criterion**: The paper specifies patience=5 on dev macro-F1 during Phase 3 fine-tuning but does not detail whether evaluation is per-model or ensemble-based. This implementation uses the ensemble macro-F1 (averaged softmax of both models) as the stopping metric for both models' early stopping trackers. Both models must independently exhaust patience before training stops (`trainer.py` lines 316-325). Using ensemble F1 is reasonable because the ensemble is the final evaluation artifact.
+
 ## Workflow Rules
 
 - Every code change (new or modified) must include corresponding test cases in `tests/`. After writing tests, run `python -m pytest tests/ -v` to verify all tests pass before considering the change complete.

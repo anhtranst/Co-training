@@ -1,16 +1,62 @@
-"""CLI entry point for running LG-CoTrain experiments."""
+"""CLI entry point for running LG-CoTrain experiments.
+
+Supports single experiments or batch mode with multiple events/budgets/seeds.
+"""
 
 import argparse
 
 from .config import LGCoTrainConfig
-from .trainer import LGCoTrainer
+from .run_all import BUDGETS, SEED_SETS, format_summary_table, run_all_experiments
 
 
 def main():
     parser = argparse.ArgumentParser(description="LG-CoTrain experiment runner")
-    parser.add_argument("--event", type=str, default="canada_wildfires_2016")
-    parser.add_argument("--budget", type=int, default=5, choices=[5, 10, 25, 50])
-    parser.add_argument("--seed-set", type=int, default=1, choices=[1, 2, 3])
+
+    # Event(s) — supports both --event (single) and --events (multiple)
+    event_group = parser.add_mutually_exclusive_group(required=True)
+    event_group.add_argument(
+        "--event", type=str, dest="events", nargs=1,
+        help="Single disaster event name",
+    )
+    event_group.add_argument(
+        "--events", type=str, nargs="+",
+        help="One or more disaster event names",
+    )
+
+    # Budget(s)
+    budget_group = parser.add_mutually_exclusive_group()
+    budget_group.add_argument(
+        "--budget", type=int, dest="budgets", nargs=1,
+        help="Single budget value",
+    )
+    budget_group.add_argument(
+        "--budgets", type=int, nargs="+", default=None,
+        help="One or more budget values (default: all [5, 10, 25, 50])",
+    )
+
+    # Seed set(s)
+    seed_group = parser.add_mutually_exclusive_group()
+    seed_group.add_argument(
+        "--seed-set", type=int, dest="seed_sets", nargs=1,
+        help="Single seed set",
+    )
+    seed_group.add_argument(
+        "--seed-sets", type=int, nargs="+", default=None,
+        help="One or more seed sets (default: all [1, 2, 3])",
+    )
+
+    # Pseudo-label source and output
+    parser.add_argument(
+        "--pseudo-label-source", type=str, default="gpt-4o",
+        help="Pseudo-label directory name under data/pseudo-labelled/ (default: gpt-4o)",
+    )
+    parser.add_argument(
+        "--output-folder", type=str, default=None,
+        help="Output folder for results (overrides --results-root). "
+             "E.g. results/gpt-4o-1st-run",
+    )
+
+    # Model hyperparameters
     parser.add_argument("--model-name", type=str, default="bert-base-uncased")
     parser.add_argument("--weight-gen-epochs", type=int, default=7)
     parser.add_argument("--cotrain-epochs", type=int, default=10)
@@ -19,15 +65,21 @@ def main():
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max-seq-length", type=int, default=128)
+
+    # Paths
     parser.add_argument("--data-root", type=str, default="/workspace/data")
     parser.add_argument("--results-root", type=str, default="/workspace/results")
 
     args = parser.parse_args()
 
-    config = LGCoTrainConfig(
-        event=args.event,
-        budget=args.budget,
-        seed_set=args.seed_set,
+    events = args.events
+    budgets = args.budgets
+    seed_sets = args.seed_sets
+    results_root = args.output_folder or args.results_root
+
+    # Common hyperparameter kwargs
+    hyperparams = dict(
+        pseudo_label_source=args.pseudo_label_source,
         model_name=args.model_name,
         weight_gen_epochs=args.weight_gen_epochs,
         cotrain_epochs=args.cotrain_epochs,
@@ -36,16 +88,35 @@ def main():
         batch_size=args.batch_size,
         lr=args.lr,
         max_seq_length=args.max_seq_length,
-        data_root=args.data_root,
-        results_root=args.results_root,
     )
 
-    trainer = LGCoTrainer(config)
-    results = trainer.run()
+    # Run experiments for each event via run_all_experiments
+    # (handles both single and multi budget/seed cases uniformly)
+    for event in events:
+        all_results = run_all_experiments(
+            event,
+            budgets=budgets,
+            seed_sets=seed_sets,
+            data_root=args.data_root,
+            results_root=results_root,
+            **hyperparams,
+        )
 
-    print(f"\nFinal Results:")
-    print(f"  Test Error Rate: {results['test_error_rate']:.2f}%")
-    print(f"  Test Macro-F1:   {results['test_macro_f1']:.4f}")
+        # Single experiment: show inline results
+        if (
+            budgets is not None and len(budgets) == 1
+            and seed_sets is not None and len(seed_sets) == 1
+        ):
+            result = all_results[0]
+            if result is not None:
+                print(f"\nFinal Results:")
+                print(f"  Test Error Rate: {result['test_error_rate']:.2f}%")
+                print(f"  Test Macro-F1:   {result['test_macro_f1']:.4f}")
+        else:
+            print()
+            print(format_summary_table(
+                all_results, event, budgets=budgets, seed_sets=seed_sets,
+            ))
 
 
 if __name__ == "__main__":

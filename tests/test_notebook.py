@@ -203,10 +203,10 @@ class TestNotebookContent(unittest.TestCase):
         self.assertIn("lambda1[sample_idx]", phase2_cell)
 
     def test_phase2_seeds_from_phase1(self):
-        """Phase 2 seeds its trackers from Phase 1's last epoch."""
+        """Phase 2 seeds its trackers from Phase 1's full history."""
         phase2_cell = "".join(self.nb["cells"][19]["source"])
-        self.assertIn("tracker1.prob_history[-1]", phase2_cell)
-        self.assertIn("tracker2.prob_history[-1]", phase2_cell)
+        self.assertIn("seed_from_tracker(tracker1)", phase2_cell)
+        self.assertIn("seed_from_tracker(tracker2)", phase2_cell)
 
     def test_phase3_uses_early_stopping(self):
         """Phase 3 uses EarlyStopping and restores best models."""
@@ -346,6 +346,177 @@ class TestNotebookDataFiles(unittest.TestCase):
 
     def test_test_file_exists(self):
         self.assertTrue(os.path.exists(self.cfg.test_path), self.cfg.test_path)
+
+
+NOTEBOOK_03_PATH = "/workspace/Notebooks/03_all_disasters_rerun.ipynb"
+
+
+class TestNotebook03Structure(unittest.TestCase):
+    """Test the notebook 03 file structure and cell layout."""
+
+    def setUp(self):
+        with open(NOTEBOOK_03_PATH) as f:
+            self.nb = json.load(f)
+
+    def test_notebook_is_valid_ipynb(self):
+        """Notebook has required top-level keys for a valid .ipynb file."""
+        self.assertIn("cells", self.nb)
+        self.assertIn("metadata", self.nb)
+        self.assertIn("nbformat", self.nb)
+        self.assertEqual(self.nb["nbformat"], 4)
+
+    def test_cell_count(self):
+        """Notebook has the expected number of cells (10)."""
+        self.assertEqual(len(self.nb["cells"]), 10)
+
+    def test_cell_types(self):
+        """Verify the expected pattern of markdown and code cells."""
+        expected_types = [
+            "markdown",  # 0: Title + explanation
+            "code",      # 1: Setup — imports, repo root
+            "code",      # 2: Configuration cell
+            "code",      # 3: Event discovery + completion check
+            "markdown",  # 4: Running experiments explanation
+            "code",      # 5: Main experiment loop
+            "markdown",  # 6: Cross-disaster results explanation
+            "code",      # 7: Cross-disaster summary + plots
+            "code",      # 8: Generate dashboard
+            "markdown",  # 9: Summary with CLI equivalents
+        ]
+        actual_types = [cell["cell_type"] for cell in self.nb["cells"]]
+        self.assertEqual(actual_types, expected_types)
+
+    def test_all_cells_have_source(self):
+        """Every cell has a non-empty source field."""
+        for i, cell in enumerate(self.nb["cells"]):
+            source = "".join(cell["source"])
+            self.assertTrue(
+                len(source.strip()) > 0,
+                f"Cell {i} has empty source",
+            )
+
+    def test_code_cells_have_no_outputs(self):
+        """Code cells have no pre-filled outputs (clean notebook)."""
+        for i, cell in enumerate(self.nb["cells"]):
+            if cell["cell_type"] == "code":
+                outputs = cell.get("outputs", [])
+                self.assertEqual(
+                    len(outputs), 0,
+                    f"Code cell {i} has pre-filled outputs",
+                )
+
+
+class TestNotebook03Config(unittest.TestCase):
+    """Test that notebook 03 uses configurable pseudo-label source and run name."""
+
+    def setUp(self):
+        with open(NOTEBOOK_03_PATH) as f:
+            self.nb = json.load(f)
+        self.all_code = "\n".join(
+            "".join(c["source"]) for c in self.nb["cells"] if c["cell_type"] == "code"
+        )
+
+    def test_config_has_pseudo_label_source(self):
+        """Configuration cell defines PSEUDO_LABEL_SOURCE."""
+        config_cell = "".join(self.nb["cells"][2]["source"])
+        self.assertIn("PSEUDO_LABEL_SOURCE", config_cell)
+
+    def test_config_has_run_name(self):
+        """Configuration cell defines RUN_NAME."""
+        config_cell = "".join(self.nb["cells"][2]["source"])
+        self.assertIn("RUN_NAME", config_cell)
+
+    def test_results_root_uses_run_name(self):
+        """RESULTS_ROOT includes the RUN_NAME sub-folder."""
+        config_cell = "".join(self.nb["cells"][2]["source"])
+        self.assertIn("results\" / RUN_NAME", config_cell)
+
+    def test_pseudo_label_source_passed_to_run_all(self):
+        """Experiment loop passes pseudo_label_source=PSEUDO_LABEL_SOURCE."""
+        experiment_cell = "".join(self.nb["cells"][5]["source"])
+        self.assertIn("pseudo_label_source=PSEUDO_LABEL_SOURCE", experiment_cell)
+
+    def test_results_root_passed_to_run_all(self):
+        """Experiment loop passes results_root=RESULTS_ROOT."""
+        experiment_cell = "".join(self.nb["cells"][5]["source"])
+        self.assertIn("results_root=RESULTS_ROOT", experiment_cell)
+
+
+class TestNotebook03Imports(unittest.TestCase):
+    """Test that notebook 03 imports required modules."""
+
+    def setUp(self):
+        with open(NOTEBOOK_03_PATH) as f:
+            self.nb = json.load(f)
+        self.imports_source = "".join(self.nb["cells"][1]["source"])
+
+    def test_imports_sys_path(self):
+        """Notebook dynamically adds repo root to sys.path."""
+        self.assertIn("_find_repo_root", self.imports_source)
+        self.assertIn("sys.path.insert(0,", self.imports_source)
+
+    def test_imports_run_all(self):
+        """Notebook imports run_all_experiments and format_summary_table."""
+        self.assertIn("run_all_experiments", self.imports_source)
+        self.assertIn("format_summary_table", self.imports_source)
+
+    def test_imports_budgets_and_seeds(self):
+        """Notebook imports BUDGETS and SEED_SETS constants."""
+        self.assertIn("BUDGETS", self.imports_source)
+        self.assertIn("SEED_SETS", self.imports_source)
+
+    def test_imports_matplotlib(self):
+        self.assertIn("import matplotlib.pyplot as plt", self.imports_source)
+
+
+class TestNotebook03Content(unittest.TestCase):
+    """Test that notebook 03 has the expected experiment and dashboard logic."""
+
+    def setUp(self):
+        with open(NOTEBOOK_03_PATH) as f:
+            self.nb = json.load(f)
+        self.all_code = "\n".join(
+            "".join(c["source"]) for c in self.nb["cells"] if c["cell_type"] == "code"
+        )
+
+    def test_event_discovery(self):
+        """Notebook discovers events from data directory."""
+        discovery_cell = "".join(self.nb["cells"][3]["source"])
+        self.assertIn("is_event_complete", discovery_cell)
+        self.assertIn("completed_events", discovery_cell)
+        self.assertIn("pending_events", discovery_cell)
+
+    def test_progress_tracker(self):
+        """Notebook uses ProgressTracker for monitoring."""
+        exp_cell = "".join(self.nb["cells"][5]["source"])
+        self.assertIn("ProgressTracker", exp_cell)
+        self.assertIn("_on_experiment_done=tracker.update", exp_cell)
+
+    def test_cross_disaster_summary(self):
+        """Notebook builds cross-disaster summary."""
+        summary_cell = "".join(self.nb["cells"][7]["source"])
+        self.assertIn("summary", summary_cell)
+        self.assertIn("test_macro_f1", summary_cell)
+
+    def test_visualizations_present(self):
+        """Notebook has plots."""
+        summary_cell = "".join(self.nb["cells"][7]["source"])
+        self.assertIn("plt.show()", summary_cell)
+
+    def test_dashboard_generation(self):
+        """Notebook generates an HTML dashboard."""
+        dashboard_cell = "".join(self.nb["cells"][8]["source"])
+        self.assertIn("collect_all_metrics", dashboard_cell)
+        self.assertIn("generate_html", dashboard_cell)
+        self.assertIn("dashboard.html", dashboard_cell)
+        self.assertIn("RESULTS_ROOT", dashboard_cell)
+
+    def test_summary_shows_cli_equivalent(self):
+        """Summary markdown includes CLI equivalent commands."""
+        summary_md = "".join(self.nb["cells"][9]["source"])
+        self.assertIn("--pseudo-label-source", summary_md)
+        self.assertIn("--output-folder", summary_md)
+        self.assertIn("run_experiment", summary_md)
 
 
 if __name__ == "__main__":

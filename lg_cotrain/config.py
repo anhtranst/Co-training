@@ -11,6 +11,9 @@ class LGCoTrainConfig:
     budget: int = 5
     seed_set: int = 1
 
+    # Pseudo-label source directory name (under data/pseudo-labelled/)
+    pseudo_label_source: str = "gpt-4o"
+
     # Model
     model_name: str = "bert-base-uncased"
     num_labels: int = 10
@@ -49,7 +52,7 @@ class LGCoTrainConfig:
 
     def __post_init__(self):
         original_dir = Path(self.data_root) / "original" / self.event
-        pseudo_dir = Path(self.data_root) / "pseudo-labelled" / "gpt-4o" / self.event
+        pseudo_dir = Path(self.data_root) / "pseudo-labelled" / self.pseudo_label_source / self.event
 
         self.labeled_path = str(
             original_dir / f"labeled_{self.budget}_set{self.seed_set}.tsv"
