@@ -91,6 +91,75 @@ def collect_all_metrics(results_root):
     return metrics
 
 
+def _count_tsv_labels(path):
+    """Read a TSV file and return {class_label: count} using only stdlib csv."""
+    import csv
+    counts = {}
+    try:
+        with open(path, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh, delimiter="\t")
+            if "class_label" not in (reader.fieldnames or []):
+                return {}
+            for row in reader:
+                label = row.get("class_label", "").strip()
+                if label:
+                    counts[label] = counts.get(label, 0) + 1
+    except Exception:
+        return {}
+    return counts
+
+
+def collect_data_stats(data_root):
+    """Scan data_root/original/{event}/ TSV files and count class_label occurrences.
+
+    Uses seed 1 as the representative for labeled/unlabeled subsets. Returns a nested
+    dict: {event: {file_key: {class_label: count}}}. Missing or unreadable files produce
+    an empty dict for that key. Returns {} if data_root/original/ does not exist.
+
+    Uses pandas when available for speed; falls back to stdlib csv otherwise.
+    """
+    root = Path(data_root) / "original"
+    if not root.is_dir():
+        return {}
+
+    try:
+        import pandas as pd
+        def _read(path):
+            df = pd.read_csv(path, sep="\t", dtype={"tweet_id": str},
+                             usecols=["class_label"])
+            return df["class_label"].value_counts().to_dict()
+    except ImportError:
+        _read = _count_tsv_labels
+
+    stats = {}
+    for event_dir in sorted(root.iterdir()):
+        if not event_dir.is_dir():
+            continue
+        event = event_dir.name
+        file_map = {
+            "train": event_dir / f"{event}_train.tsv",
+            "dev":   event_dir / f"{event}_dev.tsv",
+            "test":  event_dir / f"{event}_test.tsv",
+        }
+        for budget in BUDGETS:
+            file_map[f"labeled_{budget}_set1"]   = event_dir / f"labeled_{budget}_set1.tsv"
+            file_map[f"unlabeled_{budget}_set1"] = event_dir / f"unlabeled_{budget}_set1.tsv"
+
+        event_stats = {}
+        for key, path in file_map.items():
+            if not path.exists():
+                event_stats[key] = {}
+                continue
+            try:
+                event_stats[key] = _read(path)
+            except Exception:
+                event_stats[key] = {}
+
+        stats[event] = event_stats
+
+    return stats
+
+
 def count_expected_experiments(events=None):
     """Return total expected: len(events) * len(BUDGETS) * len(SEED_SETS)."""
     if events is None:
@@ -414,6 +483,20 @@ def _ece_class(val):
     return "cell-vlow"
 
 
+def _count_cell_style(count, max_count):
+    """Return inline style string for heat-map coloring of a class-count cell."""
+    if max_count == 0 or count == 0:
+        return 'style="background:#f8f9fa; color:#adb5bd;"'
+    ratio = count / max_count
+    if ratio >= 0.60:
+        return 'style="background:#cce5ff; color:#004085;"'
+    if ratio >= 0.30:
+        return 'style="background:#d4edda; color:#155724;"'
+    if ratio >= 0.10:
+        return 'style="background:#fff3cd; color:#856404;"'
+    return 'style="background:#f8d7da; color:#721c24;"'
+
+
 def _fmt_cell(mean, std, fmt, color_fn=None):
     """Format a pivot cell with optional +/-std."""
     if mean is None:
@@ -682,6 +765,382 @@ click column headers to sort</p>
 </table></div>"""
 
 
+def _render_data_guide():
+    """Return the static Interpretation Guide HTML shown below the event tables."""
+
+    # ── colour legend swatches ─────────────────────────────────────────────────
+    def swatch(bg, fg, label):
+        return (
+            f'<span style="display:inline-block;background:{bg};color:{fg};'
+            f'padding:1px 8px;border-radius:3px;font-size:12px;margin-right:4px;">'
+            f'<strong>{label}</strong></span>'
+        )
+
+    swatches = (
+        swatch("#cce5ff", "#004085", "Blue — high (≥ 60% of max train count)")
+        + swatch("#d4edda", "#155724", "Green — medium (30–59%)")
+        + swatch("#fff3cd", "#856404", "Yellow — low (10–29%)")
+        + swatch("#f8d7da", "#721c24", "Red — very low (< 10%)")
+        + swatch("#f8f9fa", "#adb5bd", "Grey — 0 (absent)")
+    )
+
+    # ── shared sub-heading style ───────────────────────────────────────────────
+    SH = 'style="font-size:15px;font-weight:700;margin:28px 0 8px 0;"'
+    P  = 'style="font-size:13px;line-height:1.7;margin:0 0 10px 0;"'
+    UL = 'style="font-size:13px;line-height:1.8;margin:0 0 12px 0;padding-left:24px;"'
+
+    # ── callout box helper ─────────────────────────────────────────────────────
+    def callout(bg, border, content):
+        return (
+            f'<div style="background:{bg};border-left:4px solid {border};'
+            f'padding:12px 16px;border-radius:4px;font-size:13px;'
+            f'line-height:1.7;margin:12px 0 4px 0;">{content}</div>'
+        )
+
+    # ── scenario heading helper ────────────────────────────────────────────────
+    def scenario_heading(border_col, text):
+        return (
+            f'<p {SH} style="font-size:15px;font-weight:700;margin:28px 0 8px 0;'
+            f'padding-left:12px;border-left:4px solid {border_col};">{text}</p>'
+        )
+
+    # ==========================================================================
+    # Section 1 — How to read the table
+    # ==========================================================================
+    s1 = (
+        f'<p {SH}>How to Read This Table</p>'
+        f'<p {P}><strong>Column groups</strong></p>'
+        f'<ul {UL}>'
+        f'<li><strong>Train&nbsp;/&nbsp;Dev&nbsp;/&nbsp;Test</strong> — the full dataset splits '
+        f'for this event (all available samples across all seed sets).</li>'
+        f'<li><strong>L5, L10, L25, L50</strong> — the labeled training subset at the given '
+        f'budget (target: that many samples <em>per class</em>), using seed&nbsp;1 as a '
+        f'representative. This is the set the two BERT models are supervised-trained on in '
+        f'Phase&nbsp;1 (weight generation) and Phase&nbsp;3 (fine-tuning).</li>'
+        f'<li><strong>U5, U10, U25, U50</strong> — the unlabeled complement at each budget '
+        f'(seed&nbsp;1). These are the tweets <em>excluded</em> from the labeled set. They are '
+        f'paired with GPT-4o pseudo-labels to form D<sub>LG</sub>, the sole training set for '
+        f'Phase&nbsp;2 co-training. A larger labeled budget means a smaller unlabeled '
+        f'complement.</li>'
+        f'</ul>'
+        f'<p {P}><strong>Heat-map colouring</strong> — each cell is coloured relative to the '
+        f'largest class count in the Train column for that event:</p>'
+        f'<p style="margin:0 0 16px 0;">{swatches}</p>'
+    )
+
+    # ==========================================================================
+    # Section 2 — Warning signs
+    # ==========================================================================
+    s2 = (
+        f'<p {SH}>Warning Signs to Look For</p>'
+        f'<ul {UL}>'
+        f'<li><strong>L# &lt; budget for a class</strong> — the class does not have enough '
+        f'samples to fill the requested budget. All available samples are used, but the labeled '
+        f'set becomes imbalanced. <em>Example: budget&nbsp;=&nbsp;25 but the class only has 14 '
+        f'training samples &rarr; L25 shows 14, not 25.</em></li>'
+        f'<li><strong>L# stays the same across multiple budget levels</strong> — the class has '
+        f'hit its natural ceiling; all available samples are already included. Increasing the '
+        f'budget no longer adds real training data for that class. <em>Example: if both L25 and '
+        f'L50 show 14, the class has exactly 14 samples in the training set.</em></li>'
+        f'<li><strong>U# = 0 for a class</strong> — all samples of that class were consumed by '
+        f'the labeled set; none remain for the unlabeled complement D<sub>LG</sub>. '
+        f'Co-training in Phase&nbsp;2 receives no genuine examples of this class, only noise '
+        f'from GPT-4o misclassifications.</li>'
+        f'<li><strong>L# = Train count for a class</strong> — the entire training set for that '
+        f'class is labeled. Combined with U#&nbsp;=&nbsp;0, all available data has been '
+        f'exhausted; the algorithm has no headroom for semi-supervised learning on that '
+        f'class.</li>'
+        f'</ul>'
+    )
+
+    # ==========================================================================
+    # Section 3 — Scenario 1: Unbalanced Labeled Set
+    # ==========================================================================
+    s3 = (
+        scenario_heading("#004085", "Scenario&nbsp;1 — Unbalanced Labeled Set "
+                         "(some L# &lt; budget)")
+        + f'<p {P}><strong>All three training phases are degraded for the '
+          f'underrepresented class.</strong> The core problem is that standard cross-entropy '
+          f'loss treats every sample equally — majority classes dominate the gradient signal '
+          f'because they appear more often per epoch.</p>'
+        + f'<ul {UL}>'
+        + f'<li><strong>Phase&nbsp;1 (Weight Generation) — unreliable lambda weights.</strong> '
+          f'Model&nbsp;1 and Model&nbsp;2 are each trained on half the labeled set (D<sub>l1</sub> '
+          f'and D<sub>l2</sub>). For a class with only 14 total samples each model sees roughly '
+          f'7 examples — compared to hundreds for majority classes. With so few examples the '
+          f'model\'s softmax probability for that class stays low and fluctuates unpredictably '
+          f'across epochs. The <em>WeightTracker</em> records these noisy probabilities: '
+          f'<em>confidence</em> (mean probability) is low and <em>variability</em> (std) is '
+          f'inflated. The resulting lambda weights &mdash; which determine how much each '
+          f'D<sub>LG</sub> sample contributes to Phase&nbsp;2 training &mdash; are either '
+          f'near-zero (the sample is ignored) or erratic (the sample receives inconsistent '
+          f'weight). Neither outcome is useful.</li>'
+        + f'<li><strong>Phase&nbsp;2 (Co-Training) — a self-reinforcing feedback loop.</strong> '
+          f'Lambda weights scale each sample\'s contribution to the co-training loss. Samples '
+          f'pseudo-labeled as the rare class receive systematically low weights, so they '
+          f'contribute little gradient, so the model does not improve on that class, so the '
+          f'next epoch\'s weights remain low — a vicious cycle with no internal break. '
+          f'For example, if <em>rescue_volunteering_or_donation_effort</em> has 653 training '
+          f'samples and <em>requests_or_urgent_needs</em> has only 14, Phase&nbsp;2 learns an '
+          f'excellent boundary for the former and a weak, uncertain one for the latter, '
+          f'regardless of how many pseudo-labeled examples of the rare class exist in '
+          f'D<sub>LG</sub>.</li>'
+        + f'<li><strong>Phase&nbsp;3 (Fine-Tuning) — too little data to correct Phase&nbsp;2 '
+          f'bias.</strong> Fine-tuning revisits only D<sub>l1</sub> and D<sub>l2</sub> — the '
+          f'same small labeled set split in half again. Seven genuine examples cannot overcome '
+          f'a poorly calibrated decision boundary built over many co-training epochs. Early '
+          f'stopping compounds the problem: the overall dev macro-F1 may look acceptable '
+          f'because all majority classes improved, causing early stopping to fire before the '
+          f'minority class is properly learned.</li>'
+        + f'</ul>'
+        + callout(
+            "#e8f4fd", "#3498db",
+            f'<strong>Example — Canada Wildfires 2016, '
+            f'<em>requests_or_urgent_needs</em>:</strong> '
+            f'This class has only 14 samples in Train. At any budget &ge;&nbsp;25, all 14 are '
+            f'consumed by the labeled set. Each model receives only ~7 examples, compared to '
+            f'~326 for <em>rescue_volunteering_or_donation_effort</em> at the same budget. '
+            f'The macro-F1 contribution from this class is consistently much lower than from '
+            f'majority classes, anchoring the event\'s overall score below what a balanced '
+            f'dataset would achieve.'
+        )
+    )
+
+    # ==========================================================================
+    # Section 4 — Scenario 2: Unbalanced Unlabeled Set
+    # ==========================================================================
+    s4 = (
+        scenario_heading("#856404", "Scenario&nbsp;2 — Unbalanced Unlabeled Set "
+                         "(some U# is very low or zero)")
+        + f'<p {P}>D<sub>LG</sub> is the <em>exclusive</em> training data for Phase&nbsp;2. '
+          f'Its class composition is therefore critical. Two distinct sub-cases arise.</p>'
+        + f'<ul {UL}>'
+        + f'<li><strong>Sub-case A — U# is low but &gt;&nbsp;0: weak but genuine '
+          f'signal.</strong> Phase&nbsp;2 still receives real examples of the class with '
+          f'(hopefully) correct pseudo-labels. The lambda weighting partially compensates '
+          f'by amplifying high-confidence samples, but the proportionally small class '
+          f'representation means the model underfits that class relative to majority classes. '
+          f'Performance will be below ideal, but the learning direction is at least correct.</li>'
+        + f'<li><strong>Sub-case B — U# = 0: co-training trains on noise, actively corrupting '
+          f'the decision boundary.</strong> When no real samples of class&nbsp;C exist in '
+          f'D<sub>LG</sub>, the only way class&nbsp;C appears there is through GPT-4o '
+          f'misclassification errors — tweets from other classes that GPT-4o incorrectly '
+          f'tagged as class&nbsp;C. Phase&nbsp;2 then uses these <em>false</em> pseudo-labels '
+          f'as genuine training signal:'
+          f'<ul style="margin-top:6px;margin-bottom:6px;">'
+          f'<li>The cross-entropy loss pushes the model to classify those tweets as '
+          f'class&nbsp;C.</li>'
+          f'<li>Those tweets actually belong to other classes, so the model is learning the '
+          f'wrong feature associations for class&nbsp;C.</li>'
+          f'<li>The decision boundary for class&nbsp;C shifts toward the feature distributions '
+          f'of whatever classes GPT-4o confused with it.</li>'
+          f'</ul>'
+          f'This is actively harmful — worse than simply ignoring the class. Phase&nbsp;3 '
+          f'fine-tuning must both relearn the correct boundary <em>and</em> fight the '
+          f'corrupted one from Phase&nbsp;2, armed with only a handful of genuine samples.</li>'
+        + f'</ul>'
+        + callout(
+            "#fff8e1", "#f0a500",
+            f'<strong>Example — Canada Wildfires 2016, '
+            f'<em>requests_or_urgent_needs</em> at budget&nbsp;25/50:</strong> '
+            f'U25&nbsp;=&nbsp;0 and U50&nbsp;=&nbsp;0. No genuine tweets of this class are '
+            f'available for co-training. Any pseudo-labels tagged as '
+            f'<em>requests_or_urgent_needs</em> in D<sub>LG</sub> come from other classes '
+            f'that GPT-4o mislabelled — for instance, a '
+            f'<em>rescue_volunteering_or_donation_effort</em> tweet containing "urgent" might '
+            f'be mislabelled. The co-training model then learns to associate "urgent '
+            f'volunteering appeals" with <em>requests_or_urgent_needs</em>, corrupting the '
+            f'representation of both classes simultaneously.'
+        )
+    )
+
+    # ==========================================================================
+    # Section 5 — Scenario 3: Both Unbalanced (worst case)
+    # ==========================================================================
+    budget_table = (
+        f'<div style="overflow-x:auto;margin:8px 0 12px 0;">'
+        f'<table style="width:auto;border-collapse:collapse;font-size:13px;">'
+        f'<thead><tr style="background:#2d3adf;color:#fff;">'
+        f'<th style="padding:8px 16px;text-align:left;">Budget</th>'
+        f'<th style="padding:8px 16px;text-align:center;">Labeled<br>samples</th>'
+        f'<th style="padding:8px 16px;text-align:center;">Real samples<br>in D<sub>LG</sub></th>'
+        f'<th style="padding:8px 16px;text-align:left;">Co-training signal</th>'
+        f'</tr></thead><tbody>'
+        f'<tr><td style="padding:7px 16px;border-bottom:1px solid #dee2e6;">L5</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;text-align:center;">5</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;text-align:center;">9</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;color:#155724;">'
+        f'&#10003; 9 genuine examples available</td></tr>'
+        f'<tr><td style="padding:7px 16px;border-bottom:1px solid #dee2e6;">L10</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;text-align:center;">10</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;text-align:center;">4</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;color:#856404;">'
+        f'&#126; 4 genuine examples (signal shrinking)</td></tr>'
+        f'<tr style="background:#fff8f8;">'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;">L25</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;text-align:center;">'
+        f'14 (capped)</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;text-align:center;">0</td>'
+        f'<td style="padding:7px 16px;border-bottom:1px solid #dee2e6;color:#721c24;">'
+        f'&#10007; noise only &mdash; can be <em>worse</em> than L10</td></tr>'
+        f'<tr style="background:#fff8f8;">'
+        f'<td style="padding:7px 16px;">L50</td>'
+        f'<td style="padding:7px 16px;text-align:center;">14 (capped)</td>'
+        f'<td style="padding:7px 16px;text-align:center;">0</td>'
+        f'<td style="padding:7px 16px;color:#721c24;">'
+        f'&#10007; noise only &mdash; identical situation to L25</td></tr>'
+        f'</tbody></table></div>'
+    )
+
+    s5 = (
+        scenario_heading("#721c24", "Scenario&nbsp;3 — Both Labeled and Unlabeled Are "
+                         "Unbalanced (the Worst Case)")
+        + f'<p {P}><strong>All three phases reinforce each other\'s weaknesses. Recovery is '
+          f'impossible for the affected class.</strong> This occurs when a class has too few '
+          f'labeled samples (Scenario&nbsp;1) <em>and</em> no real samples in D<sub>LG</sub> '
+          f'(Scenario&nbsp;2, sub-case B) simultaneously.</p>'
+        + f'<ul {UL}>'
+        + f'<li><strong>Phase&nbsp;1:</strong> Too few labeled samples &rarr; low, noisy '
+          f'probabilities &rarr; unreliable lambda weights.</li>'
+        + f'<li><strong>Phase&nbsp;2:</strong> Zero real samples in D<sub>LG</sub> &rarr; '
+          f'trains entirely on GPT-4o misclassification noise &rarr; corrupted decision '
+          f'boundary.</li>'
+        + f'<li><strong>Phase&nbsp;3:</strong> Too few labeled samples to correct the '
+          f'corruption accumulated in Phase&nbsp;2.</li>'
+        + f'</ul>'
+        + f'<p {P}><strong>The budget paradox — more data can produce lower '
+          f'performance.</strong> As the budget grows, the labeled set expands but the '
+          f'unlabeled complement shrinks. For a rare class this creates a non-monotonic '
+          f'performance curve where macro-F1 at budget&nbsp;25 can be <em>lower</em> than at '
+          f'budget&nbsp;10 for the same event. The table below uses '
+          f'<em>requests_or_urgent_needs</em> in Canada Wildfires 2016 (14 total train '
+          f'samples) as a concrete illustration:</p>'
+        + budget_table
+        + f'<p {P}>More labeled data does not always mean better performance when the '
+          f'unlabeled complement is simultaneously depleted by that increase.</p>'
+        + callout(
+            "#fdf0f0", "#c0392b",
+            f'<strong>Root cause — a violated semi-supervised learning assumption.</strong> '
+            f'LG-CoTrain assumes the unlabeled data distribution reflects the true class '
+            f'distribution. When D<sub>LG</sub> is constructed by excluding the labeled set '
+            f'and a class is rare enough that the budget ceiling exhausts all of its '
+            f'available samples, this assumption breaks completely for that class. The '
+            f'algorithm cannot distinguish "this class is genuinely rare in the wild" from '
+            f'"this class was artificially removed from the unlabeled pool by the '
+            f'experimental design." The result: the pipeline can actively harm performance '
+            f'on rare classes at higher budgets — a failure mode invisible from the results '
+            f'tables alone, but clearly visible in the data distribution tables above.'
+        )
+    )
+
+    # ==========================================================================
+    # Assemble
+    # ==========================================================================
+    return (
+        '<div class="table-section" style="margin-top:52px;padding-top:36px;'
+        'border-top:3px solid #dee2e6;">'
+        '<h2 style="font-size:18px;margin-bottom:4px;">Interpretation Guide</h2>'
+        '<p class="hint">How to read the tables above and understand their impact '
+        'on the LG-CoTrain pipeline</p>'
+        + s1 + s2 + s3 + s4 + s5
+        + '</div>'
+    )
+
+
+def _render_data_tab(data_stats):
+    """Render the Data Analysis tab HTML: one class-count table per disaster event.
+
+    Columns: Train | Dev | Test | L5 | L10 | L25 | L50 | U5 | U10 | U25 | U50
+    Rows: only class labels present in that event's data (alphabetically sorted).
+    Cells are heat-map coloured via _count_cell_style().
+    """
+    if not data_stats:
+        return (
+            '<div class="content">'
+            '<p style="padding:40px 24px; color:#636e72;">'
+            "No data found. Ensure the <code>data/original/</code> directory exists "
+            "and is populated, or pass <code>--data-root</code> explicitly."
+            "</p></div>"
+        )
+
+    COL_KEYS = [
+        ("train",              "Train"),
+        ("dev",                "Dev"),
+        ("test",               "Test"),
+        ("labeled_5_set1",     "L5"),
+        ("labeled_10_set1",    "L10"),
+        ("labeled_25_set1",    "L25"),
+        ("labeled_50_set1",    "L50"),
+        ("unlabeled_5_set1",   "U5"),
+        ("unlabeled_10_set1",  "U10"),
+        ("unlabeled_25_set1",  "U25"),
+        ("unlabeled_50_set1",  "U50"),
+    ]
+
+    sections = []
+    for event, file_stats in data_stats.items():
+        event_name = format_event_name(event)
+
+        # Collect all class labels present across any file for this event
+        all_classes = set()
+        for counts in file_stats.values():
+            all_classes.update(counts.keys())
+        sorted_classes = sorted(all_classes)
+
+        if not sorted_classes:
+            sections.append(
+                f'<div class="table-section"><h2>{event_name}</h2>'
+                f'<p class="hint">No data files found for this event.</p></div>'
+            )
+            continue
+
+        # Heat-map reference: max count of any class in train; fallback to global max
+        train_counts = file_stats.get("train", {})
+        max_count = max(train_counts.values(), default=0) if train_counts else 0
+        if max_count == 0:
+            all_vals = [c for fc in file_stats.values() for c in fc.values()]
+            max_count = max(all_vals, default=1)
+
+        # Header row
+        header_cells = "<th>Class Label</th>" + "".join(
+            f"<th>{col_label}</th>" for _, col_label in COL_KEYS
+        )
+
+        # Data rows (one per class) + running totals
+        totals = {key: 0 for key, _ in COL_KEYS}
+        rows = []
+        for cls in sorted_classes:
+            cells = f"<td>{cls}</td>"
+            for col_key, _ in COL_KEYS:
+                count = file_stats.get(col_key, {}).get(cls, 0)
+                totals[col_key] += count
+                style = _count_cell_style(count, max_count)
+                cells += f'<td {style} data-val="{count}">{count}</td>'
+            rows.append(f"<tr>{cells}</tr>")
+
+        # Total row
+        total_cells = "<td><b>Total</b></td>" + "".join(
+            f"<td><b>{totals[key]}</b></td>" for key, _ in COL_KEYS
+        )
+        rows.append(f'<tr class="mean-row">{total_cells}</tr>')
+
+        hint = (
+            "L# = Labeled set, seed&nbsp;1, budget&nbsp;#&emsp;"
+            "U# = Unlabeled complement, seed&nbsp;1, budget&nbsp;#"
+        )
+        sections.append(
+            f'<div class="table-section"><h2>{event_name}</h2>'
+            f'<p class="hint">{hint}</p>'
+            f"<div style='overflow-x:auto'>"
+            f"<table>"
+            f"<thead><tr>{header_cells}</tr></thead>"
+            f'<tbody>{"".join(rows)}</tbody>'
+            f"</table></div></div>"
+        )
+
+    return f'<div class="content">{"".join(sections)}{_render_data_guide()}</div>'
+
+
 def _render_tab_content(metrics, results_root, tab_id="default"):
     """Render the full dashboard body for a single result set / tab."""
     events = discover_events(metrics) or DEFAULT_EVENTS
@@ -757,12 +1216,30 @@ def _render_tab_content(metrics, results_root, tab_id="default"):
 </div>"""
 
 
-def generate_html(metrics, results_root):
-    """Generate complete self-contained HTML dashboard string (single result set)."""
+def generate_html(metrics, results_root, data_root=None):
+    """Generate complete self-contained HTML dashboard string (single result set).
+
+    The dashboard has two tabs: Data Analysis (first, active) and Results.
+    """
+    if data_root is None:
+        data_root = str(_find_repo_root() / "data")
+
     events = discover_events(metrics) or DEFAULT_EVENTS
     summary = compute_summary_cards(metrics, events)
     tab_content = _render_tab_content(metrics, results_root, "default")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    data_stats = collect_data_stats(data_root)
+    data_tab_body = _render_data_tab(data_stats)
+
+    tab_bar = (
+        '<nav class="tab-bar">'
+        '<button class="tab active" data-tab="data-analysis" '
+        "onclick=\"showTab('data-analysis')\">Data Analysis</button>"
+        '<button class="tab" data-tab="default" '
+        "onclick=\"showTab('default')\">Results</button>"
+        '</nav>'
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -780,7 +1257,13 @@ def generate_html(metrics, results_root):
 {summary['disasters_total']} disasters &times; {len(BUDGETS) * len(SEED_SETS)} splits</p>
 </header>
 
-<div id="tab-default" class="tab-content active">
+{tab_bar}
+
+<div id="tab-data-analysis" class="tab-content active">
+{data_tab_body}
+</div>
+
+<div id="tab-default" class="tab-content">
 {tab_content}
 </div>
 
@@ -791,29 +1274,41 @@ def generate_html(metrics, results_root):
 </html>"""
 
 
-def generate_html_multi(result_sets):
+def generate_html_multi(result_sets, data_root=None):
     """Generate multi-tab HTML dashboard from multiple result sets.
 
     Args:
         result_sets: list of (name, path) tuples from discover_result_sets.
+        data_root: path to the data/ directory. Auto-detected from repo root if None.
     """
+    if data_root is None:
+        data_root = str(_find_repo_root() / "data")
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Build tab bar
-    tab_buttons = []
-    tab_divs = []
-    for i, (name, path) in enumerate(result_sets):
-        active = " active" if i == 0 else ""
+    # Data Analysis tab is always first and active
+    data_stats = collect_data_stats(data_root)
+    tab_buttons = [
+        '<button class="tab active" data-tab="data-analysis" '
+        "onclick=\"showTab('data-analysis')\">Data Analysis</button>"
+    ]
+    tab_divs = [
+        f'<div id="tab-data-analysis" class="tab-content active">\n'
+        f'{_render_data_tab(data_stats)}\n</div>'
+    ]
+
+    # Result set tabs (none active — data tab takes that role)
+    for name, path in result_sets:
         esc_name = name.replace('"', '&quot;')
         tab_buttons.append(
-            f'<button class="tab{active}" data-tab="{esc_name}" '
+            f'<button class="tab" data-tab="{esc_name}" '
             f"onclick=\"showTab('{esc_name}')\">{name}</button>"
         )
 
         metrics = collect_all_metrics(path)
         content = _render_tab_content(metrics, path, name)
         tab_divs.append(
-            f'<div id="tab-{esc_name}" class="tab-content{active}">\n{content}\n</div>'
+            f'<div id="tab-{esc_name}" class="tab-content">\n{content}\n</div>'
         )
 
     tab_bar_html = f'<nav class="tab-bar">{"".join(tab_buttons)}</nav>'
@@ -872,20 +1367,27 @@ def main():
         "--output", type=str, default=None,
         help="Output HTML path (default: {results_root}/dashboard.html)",
     )
+    parser.add_argument(
+        "--data-root", type=str, default=None,
+        help=(
+            "Root data directory containing original/ subfolder "
+            "(default: auto-detected from repo root)"
+        ),
+    )
     args = parser.parse_args()
 
     output = args.output or str(Path(args.results_root) / "dashboard.html")
     result_sets = discover_result_sets(args.results_root)
 
     if len(result_sets) == 1:
-        # Single result set: use single-page generation
+        # Single result set: two-tab page (Data Analysis + Results)
         name, path = result_sets[0]
         metrics = collect_all_metrics(path)
-        html = generate_html(metrics, path)
+        html = generate_html(metrics, path, data_root=args.data_root)
         total = len(metrics)
     else:
-        # Multiple result sets: use multi-tab generation
-        html = generate_html_multi(result_sets)
+        # Multiple result sets: Data Analysis tab + one tab per result set
+        html = generate_html_multi(result_sets, data_root=args.data_root)
         total = sum(len(collect_all_metrics(p)) for _, p in result_sets)
 
     Path(output).write_text(html)

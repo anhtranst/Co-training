@@ -16,10 +16,12 @@ sys.path.insert(0, "/workspace")
 from lg_cotrain.dashboard import (
     DEFAULT_EVENTS,
     EVENTS,
+    _render_data_tab,
     build_lambda_pivot,
     build_overall_means,
     build_pivot_data,
     collect_all_metrics,
+    collect_data_stats,
     compute_summary_cards,
     count_expected_experiments,
     discover_events,
@@ -60,6 +62,16 @@ def _write_metric(tmpdir, metric):
             / f"{metric['budget']}_set{metric['seed_set']}" / "metrics.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metric))
+
+
+def _write_tsv(path, rows):
+    """Write a minimal TSV with tweet_id, tweet_text, class_label columns."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["tweet_id\ttweet_text\tclass_label"]
+    for i, row in enumerate(rows):
+        lines.append(f"{i}\ttext_{i}\t{row['class_label']}")
+    path.write_text("\n".join(lines))
 
 
 class TestFormatEventName(unittest.TestCase):
@@ -517,6 +529,232 @@ class TestBackwardCompatibility(unittest.TestCase):
 
     def test_count_expected_no_args(self):
         self.assertEqual(count_expected_experiments(), 120)
+
+
+# ---------------------------------------------------------------------------
+# Tests for Data Analysis tab
+# ---------------------------------------------------------------------------
+
+class TestCollectDataStats(unittest.TestCase):
+    """Tests for collect_data_stats()."""
+
+    def test_returns_empty_if_no_data_dir(self):
+        """Missing data_root returns {}, no crash."""
+        result = collect_data_stats("/nonexistent/path/that/does/not/exist")
+        self.assertEqual(result, {})
+
+    def test_returns_empty_if_no_original_subdir(self):
+        """data_root exists but has no original/ subfolder."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = collect_data_stats(tmpdir)
+        self.assertEqual(result, {})
+
+    def test_collects_train_dev_test_counts(self):
+        """Standard train/dev/test files are loaded and class counts are correct."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig = Path(tmpdir) / "original" / "test_event"
+            orig.mkdir(parents=True)
+            _write_tsv(orig / "test_event_train.tsv", [
+                {"class_label": "not_humanitarian"},
+                {"class_label": "not_humanitarian"},
+                {"class_label": "injured_or_dead_people"},
+            ])
+            _write_tsv(orig / "test_event_dev.tsv", [
+                {"class_label": "sympathy_and_support"},
+            ])
+            _write_tsv(orig / "test_event_test.tsv", [
+                {"class_label": "not_humanitarian"},
+            ])
+            result = collect_data_stats(tmpdir)
+        self.assertIn("test_event", result)
+        event = result["test_event"]
+        self.assertEqual(event["train"]["not_humanitarian"], 2)
+        self.assertEqual(event["train"]["injured_or_dead_people"], 1)
+        self.assertEqual(event["dev"]["sympathy_and_support"], 1)
+        self.assertEqual(event["test"]["not_humanitarian"], 1)
+
+    def test_collects_labeled_for_all_budgets(self):
+        """labeled_{budget}_set1 keys are present for every budget in BUDGETS."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig = Path(tmpdir) / "original" / "test_event"
+            orig.mkdir(parents=True)
+            for budget in BUDGETS:
+                _write_tsv(orig / f"labeled_{budget}_set1.tsv", [
+                    {"class_label": "not_humanitarian"} for _ in range(budget)
+                ])
+            result = collect_data_stats(tmpdir)
+        event = result["test_event"]
+        for budget in BUDGETS:
+            key = f"labeled_{budget}_set1"
+            self.assertIn(key, event)
+            self.assertEqual(event[key]["not_humanitarian"], budget)
+
+    def test_missing_file_gives_empty_dict_for_key(self):
+        """A missing TSV file produces {} for that key — no KeyError."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig = Path(tmpdir) / "original" / "test_event"
+            orig.mkdir(parents=True)
+            _write_tsv(orig / "test_event_train.tsv", [
+                {"class_label": "not_humanitarian"},
+            ])
+            # dev, test, labeled_*, unlabeled_* are all absent
+            result = collect_data_stats(tmpdir)
+        event = result["test_event"]
+        self.assertEqual(event["dev"], {})
+        self.assertEqual(event["test"], {})
+        self.assertEqual(event["labeled_5_set1"], {})
+        self.assertEqual(event["unlabeled_50_set1"], {})
+
+    def test_multiple_events_all_present(self):
+        """Two event directories both appear in the output dict."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for event_name in ["event_alpha", "event_beta"]:
+                orig = Path(tmpdir) / "original" / event_name
+                orig.mkdir(parents=True)
+                _write_tsv(orig / f"{event_name}_train.tsv", [
+                    {"class_label": "not_humanitarian"},
+                ])
+            result = collect_data_stats(tmpdir)
+        self.assertIn("event_alpha", result)
+        self.assertIn("event_beta", result)
+
+    def test_graceful_without_pandas(self):
+        """collect_data_stats uses pure-Python fallback when pandas is unavailable."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig = Path(tmpdir) / "original" / "test_event"
+            orig.mkdir(parents=True)
+            _write_tsv(orig / "test_event_train.tsv", [
+                {"class_label": "not_humanitarian"},
+                {"class_label": "not_humanitarian"},
+            ])
+            with patch.dict("sys.modules", {"pandas": None}):
+                result = collect_data_stats(tmpdir)
+        # Pure-Python path still returns data — no longer returns {}
+        self.assertIn("test_event", result)
+        self.assertEqual(result["test_event"]["train"]["not_humanitarian"], 2)
+
+
+class TestRenderDataTab(unittest.TestCase):
+    """Tests for _render_data_tab()."""
+
+    # Helper to build a minimal data_stats dict for one event
+    def _minimal_stats(self, train_counts=None):
+        file_stats = {
+            "train":               train_counts or {"not_humanitarian": 10},
+            "dev":                 {},
+            "test":                {},
+            "labeled_5_set1":      {},
+            "labeled_10_set1":     {},
+            "labeled_25_set1":     {},
+            "labeled_50_set1":     {},
+            "unlabeled_5_set1":    {},
+            "unlabeled_10_set1":   {},
+            "unlabeled_25_set1":   {},
+            "unlabeled_50_set1":   {},
+        }
+        return {"test_event": file_stats}
+
+    def test_returns_string(self):
+        self.assertIsInstance(_render_data_tab({}), str)
+
+    def test_empty_stats_returns_no_data_message(self):
+        html = _render_data_tab({})
+        self.assertIn("No data found", html)
+
+    def test_renders_event_name_formatted(self):
+        stats = {"california_wildfires_2018": self._minimal_stats()["test_event"]}
+        html = _render_data_tab(stats)
+        self.assertIn("California Wildfires 2018", html)
+
+    def test_renders_class_labels_as_rows(self):
+        stats = self._minimal_stats({"not_humanitarian": 10, "caution_and_advice": 5})
+        html = _render_data_tab(stats)
+        self.assertIn("not_humanitarian", html)
+        self.assertIn("caution_and_advice", html)
+
+    def test_renders_total_row(self):
+        html = _render_data_tab(self._minimal_stats())
+        self.assertIn("Total", html)
+
+    def test_all_column_headers_present(self):
+        html = _render_data_tab(self._minimal_stats())
+        for header in ["Train", "Dev", "Test", "L5", "L10", "L25", "L50",
+                       "U5", "U10", "U25", "U50"]:
+            self.assertIn(header, html)
+
+    def test_only_present_classes_rendered(self):
+        """A class absent from all files for an event must not appear in output."""
+        stats = self._minimal_stats({"not_humanitarian": 3})
+        html = _render_data_tab(stats)
+        self.assertNotIn("injured_or_dead_people", html)
+
+    def test_event_with_no_files_shows_graceful_message(self):
+        """An event where all file_stats values are {} shows a graceful fallback."""
+        empty_stats = {key: {} for key in [
+            "train", "dev", "test",
+            "labeled_5_set1", "labeled_10_set1", "labeled_25_set1", "labeled_50_set1",
+            "unlabeled_5_set1", "unlabeled_10_set1", "unlabeled_25_set1", "unlabeled_50_set1",
+        ]}
+        html = _render_data_tab({"test_event": empty_stats})
+        self.assertIn("No data files found", html)
+
+
+# New methods for existing TestGenerateHtmlMulti
+class TestGenerateHtmlMultiDataTab(unittest.TestCase):
+    """Data Analysis tab integration tests for generate_html_multi()."""
+
+    def test_data_analysis_is_first_tab(self):
+        """'Data Analysis' button must appear before any result-set tab in the HTML."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "run-a"), _make_metric())
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(result_sets, data_root="/nonexistent/path")
+        da_pos = html.find("Data Analysis")
+        run_a_pos = html.find("run-a")
+        self.assertGreater(da_pos, -1, "Data Analysis tab not found")
+        self.assertLess(da_pos, run_a_pos, "Data Analysis must precede result-set tabs")
+
+    def test_data_tab_id_is_data_analysis(self):
+        """The data tab div must have id='tab-data-analysis'."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(result_sets, data_root="/nonexistent/path")
+        self.assertIn('id="tab-data-analysis"', html)
+
+
+class TestGenerateHtmlDataTab(unittest.TestCase):
+    """Data Analysis tab integration tests for generate_html()."""
+
+    def test_data_analysis_tab_present(self):
+        """generate_html() includes a Data Analysis tab."""
+        html = generate_html([], "/tmp/fake", data_root="/nonexistent/path")
+        self.assertIn("Data Analysis", html)
+        self.assertIn('id="tab-data-analysis"', html)
+
+    def test_data_tab_comes_before_results_tab(self):
+        """Data Analysis tab button precedes the Results tab button in HTML."""
+        html = generate_html([], "/tmp/fake", data_root="/nonexistent/path")
+        da_pos = html.find("Data Analysis")
+        results_pos = html.find(">Results<")
+        self.assertGreater(da_pos, -1, "Data Analysis tab not found")
+        self.assertGreater(results_pos, -1, "Results tab not found")
+        self.assertLess(da_pos, results_pos)
+
+
+class TestDashboardCLIDataRoot(unittest.TestCase):
+    """Tests for --data-root CLI argument."""
+
+    def test_cli_accepts_data_root_argument(self):
+        """--data-root argument is accepted and dashboard is written without crash."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("sys.argv", [
+                "dashboard",
+                "--results-root", tmpdir,
+                "--data-root", "/nonexistent/data/path",
+            ]):
+                from lg_cotrain.dashboard import main
+                main()
+            self.assertTrue((Path(tmpdir) / "dashboard.html").exists())
 
 
 if __name__ == "__main__":
