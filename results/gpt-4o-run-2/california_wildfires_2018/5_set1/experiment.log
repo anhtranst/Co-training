@@ -1324,3 +1324,10 @@
 2026-02-18 18:22:57,573 - lg_cotrain - INFO - Phase 1 epoch 3/7: mean_prob1=0.1219, mean_prob2=0.1199
 2026-02-18 18:23:08,337 - lg_cotrain - INFO - Phase 1 epoch 4/7: mean_prob1=0.1297, mean_prob2=0.1239
 2026-02-18 18:23:18,889 - lg_cotrain - INFO - Phase 1 epoch 5/7: mean_prob1=0.1381, mean_prob2=0.1335
+2026-02-18 18:23:29,365 - lg_cotrain - INFO - Phase 1 epoch 6/7: mean_prob1=0.1477, mean_prob2=0.1512
+2026-02-18 18:23:40,161 - lg_cotrain - INFO - Phase 1 epoch 7/7: mean_prob1=0.1627, mean_prob2=0.1611
+2026-02-18 18:23:40,162 - lg_cotrain - INFO - Phase 1 done. lambda1: mean=0.1583, range=[0.0598, 0.2795]
+2026-02-18 18:23:40,163 - lg_cotrain - INFO - Phase 1 done. lambda2: mean=0.1093, range=[0.0185, 0.3042]
+2026-02-18 18:23:40,163 - lg_cotrain - INFO - === Phase 2: Co-Training ===
+2026-02-18 18:24:14,843 - lg_cotrain - INFO - Phase 2 epoch 1/10: loss1=0.1521, loss2=0.2203, dev_macro_f1=0.2736, dev_err=32.17%
+2026-02-18 18:24:47,304 - lg_cotrain - INFO - Phase 2 epoch 2/10: loss1=0.0539, loss2=0.1335, dev_macro_f1=0.3192, dev_err=30.42%
