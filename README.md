@@ -380,8 +380,8 @@ Three Jupyter notebooks are provided in the `Notebooks/` directory:
 | `01_kaikoura_experiment.ipynb`      | Step-by-step walkthrough of the full pipeline on one event (Kaikoura Earthquake). Includes class distributions, per-epoch probability tracking, training curves, and per-class F1 charts.                                                                         |
 | `02_all_disasters_experiment.ipynb` | Runs all 120 experiments (10 events x 4 budgets x 3 seeds) with resume support. Contains cross-disaster summary tables, line plots, and heatmaps.                                                                                                                 |
 | `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{RUN_NAME}/` to enable side-by-side comparison across runs. |
-| `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/quick-stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
-| `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
+| `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/{pseudo_label_source}-quick-stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
+| `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/{pseudo_label_source}-stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 
 All notebooks support **resume** — if interrupted, they skip experiments that already have `metrics.json` files.
 
