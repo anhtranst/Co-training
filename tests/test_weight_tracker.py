@@ -250,5 +250,79 @@ class TestWeightTrackerSeedFromTracker(unittest.TestCase):
         self.assertTrue(any_different, "lambda1 and lambda2 should differ")
 
 
+class TestWeightTrackerSeedFromLastEpoch(unittest.TestCase):
+    """Test the seed_from_last_epoch classmethod."""
+
+    def test_seeded_tracker_has_exactly_one_epoch(self):
+        """Regardless of how many epochs source recorded, seeded tracker has exactly 1."""
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        source.record_epoch([0.7, 0.5, 0.8])
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        self.assertEqual(seeded.num_epochs_recorded, 1)
+
+    def test_seeded_probs_match_sources_last_epoch(self):
+        """The single seeded epoch must equal source.prob_history[-1]."""
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        conf = seeded.compute_confidence()
+        last = source.prob_history[-1]
+        for a, b in zip(conf, last):
+            self.assertAlmostEqual(a, b, places=6)
+
+    def test_variability_zero_after_single_epoch_seed(self):
+        """With only one epoch, variability must be 0."""
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        for v in seeded.compute_variability():
+            self.assertAlmostEqual(v, 0.0, places=6)
+
+    def test_confidence_after_seed_and_one_phase2_epoch(self):
+        """Core paper behaviour: confidence = mean(final_p1, p2_ep1)."""
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.4, 0.6])  # earlier Phase 1
+        source.record_epoch([0.8, 0.2])  # final Phase 1
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        seeded.record_epoch([0.6, 0.4])  # Phase 2 epoch 1
+        conf = seeded.compute_confidence()
+        # mean([0.8, 0.6]) = 0.7, mean([0.2, 0.4]) = 0.3
+        self.assertAlmostEqual(conf[0], 0.7, places=6)
+        self.assertAlmostEqual(conf[1], 0.3, places=6)
+
+    def test_does_not_use_earlier_phase1_epochs(self):
+        """Key correctness test: earlier Phase 1 epochs must be excluded."""
+        source = WeightTracker(num_samples=1)
+        source.record_epoch([0.2])  # early Phase 1 — must NOT be included
+        source.record_epoch([0.8])  # final Phase 1 — must be included
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        # Full-history copy: confidence = mean(0.2, 0.8) = 0.5 (wrong)
+        # Last-epoch only:   confidence = 0.8              (correct)
+        self.assertAlmostEqual(seeded.compute_confidence()[0], 0.8, places=6)
+
+    def test_is_independent_of_source(self):
+        """Adding epochs to the seeded tracker must not affect the source."""
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.5])
+        source.record_epoch([0.7, 0.3])
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        seeded.record_epoch([0.9, 0.1])
+        self.assertEqual(source.num_epochs_recorded, 2)
+        self.assertEqual(seeded.num_epochs_recorded, 2)
+
+    def test_data_is_deep_copy(self):
+        """Mutating the seeded history must not affect source history."""
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.6])
+        source.record_epoch([0.7, 0.8])
+        seeded = WeightTracker.seed_from_last_epoch(source)
+        seeded.prob_history[0][0] = 999.0
+        self.assertAlmostEqual(source.prob_history[-1][0], 0.7, places=6)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

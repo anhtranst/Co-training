@@ -24,7 +24,16 @@ from .data_loading import (
 )
 from .evaluate import compute_ece, compute_metrics, ensemble_predict
 from .model import create_fresh_model
-from .utils import EarlyStopping, get_device, set_seed, setup_logging
+from .utils import (
+    EarlyStopping,
+    EarlyStoppingWithDelta,
+    PerClassEarlyStopping,
+    compute_class_weights,
+    compute_imbalance_ratio,
+    get_device,
+    set_seed,
+    setup_logging,
+)
 from .weight_tracker import WeightTracker
 
 logger = logging.getLogger("lg_cotrain")
@@ -205,13 +214,11 @@ class LGCoTrainer:
         opt1 = Adam(model1.parameters(), lr=cfg.lr)
         opt2 = Adam(model2.parameters(), lr=cfg.lr)
 
-        # Seed Phase 2 trackers with FULL Phase 1 probability history so that
-        # initial lambdas retain the confidence/variability split from Phase 1
-        # (per Algorithm 1: compute lambdas from all T weight-gen epochs, then
-        # use those same lambdas as initial co-training weights).
-        cotrain_tracker1 = WeightTracker.seed_from_tracker(tracker1)
-        cotrain_tracker2 = WeightTracker.seed_from_tracker(tracker2)
-        # lambda1 and lambda2 already computed from full Phase 1 history above
+        # Per Algorithm 1: seed Phase 2 trackers with only the final Phase 1 epoch.
+        # The paper uses the last Phase 1 epoch as the initial seeding point so that
+        # Phase 2 builds its own confidence/variability from a clean starting base.
+        cotrain_tracker1 = WeightTracker.seed_from_last_epoch(tracker1)
+        cotrain_tracker2 = WeightTracker.seed_from_last_epoch(tracker2)
 
         for epoch in range(cfg.cotrain_epochs):
             model1.train()
@@ -278,8 +285,59 @@ class LGCoTrainer:
         # Phase 3: Fine-Tuning
         # ========================
         logger.info("=== Phase 3: Fine-Tuning ===")
-        es1 = EarlyStopping(patience=cfg.finetune_patience)
-        es2 = EarlyStopping(patience=cfg.finetune_patience)
+        strategy = cfg.stopping_strategy
+
+        if strategy == "baseline":
+            es1 = EarlyStopping(patience=cfg.finetune_patience)
+            es2 = EarlyStopping(patience=cfg.finetune_patience)
+
+        elif strategy == "no_early_stopping":
+            # Run all finetune_max_epochs; patience is set too high to ever fire.
+            # restore_best() still returns the best-ever checkpoint across all epochs.
+            es1 = EarlyStopping(patience=cfg.finetune_max_epochs)
+            es2 = EarlyStopping(patience=cfg.finetune_max_epochs)
+
+        elif strategy == "per_class_patience":
+            es1 = PerClassEarlyStopping(patience=cfg.finetune_patience,
+                                        num_classes=cfg.num_labels)
+            es2 = PerClassEarlyStopping(patience=cfg.finetune_patience,
+                                        num_classes=cfg.num_labels)
+
+        elif strategy == "weighted_macro_f1":
+            class_weights = compute_class_weights(df_labeled["class_label"], self.label2id)
+            es1 = EarlyStopping(patience=cfg.finetune_patience)
+            es2 = EarlyStopping(patience=cfg.finetune_patience)
+
+        elif strategy == "balanced_dev":
+            _counts = df_dev["class_label"].value_counts()
+            _min_count = int(_counts.min())
+            df_dev_balanced = (
+                df_dev.groupby("class_label", group_keys=False)
+                .apply(lambda g: g.sample(min(len(g), _min_count),
+                                           random_state=cfg.seed_set))
+            )
+            ds_dev_balanced = self._make_dataset(
+                df_dev_balanced["tweet_text"].tolist(),
+                self._encode_labels(df_dev_balanced["class_label"]),
+            )
+            loader_dev_balanced = DataLoader(ds_dev_balanced,
+                                             batch_size=cfg.batch_size, shuffle=False)
+            es1 = EarlyStopping(patience=cfg.finetune_patience)
+            es2 = EarlyStopping(patience=cfg.finetune_patience)
+
+        elif strategy == "scaled_threshold":
+            imbalance_ratio = compute_imbalance_ratio(df_labeled["class_label"])
+            es1 = EarlyStoppingWithDelta(patience=cfg.finetune_patience,
+                                         imbalance_ratio=imbalance_ratio)
+            es2 = EarlyStoppingWithDelta(patience=cfg.finetune_patience,
+                                         imbalance_ratio=imbalance_ratio)
+
+        else:
+            raise ValueError(
+                f"Unknown stopping_strategy: {strategy!r}. "
+                "Valid: 'baseline', 'no_early_stopping', 'per_class_patience', "
+                "'weighted_macro_f1', 'balanced_dev', 'scaled_threshold'"
+            )
 
         for epoch in range(cfg.finetune_max_epochs):
             # Fine-tune model1 on D_l1
@@ -306,13 +364,32 @@ class LGCoTrainer:
                 loss.backward()
                 opt2.step()
 
-            # Evaluate ensemble on dev
+            # Evaluate ensemble on dev — always on full dev set for logging
             dev_preds, dev_labels, _ = ensemble_predict(model1, model2, loader_dev, self.device)
             dev_metrics = compute_metrics(dev_labels, dev_preds)
             dev_f1 = dev_metrics["macro_f1"]
 
-            stop1 = es1.step(dev_f1, model1)
-            stop2 = es2.step(dev_f1, model2)
+            # Compute stopping signal based on strategy
+            if strategy == "per_class_patience":
+                stop1 = es1.step(dev_metrics["per_class_f1"], model1)
+                stop2 = es2.step(dev_metrics["per_class_f1"], model2)
+            elif strategy == "weighted_macro_f1":
+                per_class = dev_metrics["per_class_f1"]
+                stopping_score = (
+                    sum(w * f for w, f in zip(class_weights, per_class))
+                    / sum(class_weights)
+                )
+                stop1 = es1.step(stopping_score, model1)
+                stop2 = es2.step(stopping_score, model2)
+            elif strategy == "balanced_dev":
+                bal_preds, bal_labels, _ = ensemble_predict(
+                    model1, model2, loader_dev_balanced, self.device)
+                bal_metrics = compute_metrics(bal_labels, bal_preds)
+                stop1 = es1.step(bal_metrics["macro_f1"], model1)
+                stop2 = es2.step(bal_metrics["macro_f1"], model2)
+            else:  # baseline, no_early_stopping, scaled_threshold
+                stop1 = es1.step(dev_f1, model1)
+                stop2 = es2.step(dev_f1, model2)
 
             logger.info(
                 f"Phase 3 epoch {epoch+1}: dev_macro_f1={dev_f1:.4f}, "
@@ -350,6 +427,7 @@ class LGCoTrainer:
             "dev_error_rate": dev_metrics["error_rate"],
             "dev_macro_f1": dev_metrics["macro_f1"],
             "dev_ece": dev_ece,
+            "stopping_strategy": cfg.stopping_strategy,
             "lambda1_mean": float(lambda1.mean()),
             "lambda1_std": float(lambda1.std()),
             "lambda2_mean": float(lambda2.mean()),

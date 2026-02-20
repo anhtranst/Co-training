@@ -26,6 +26,7 @@ def run_all_experiments(
     cotrain_epochs=10,
     finetune_max_epochs=100,
     finetune_patience=5,
+    stopping_strategy="baseline",
     batch_size=32,
     lr=2e-5,
     max_seq_length=128,
@@ -93,6 +94,7 @@ def run_all_experiments(
                 cotrain_epochs=cotrain_epochs,
                 finetune_max_epochs=finetune_max_epochs,
                 finetune_patience=finetune_patience,
+                stopping_strategy=stopping_strategy,
                 batch_size=batch_size,
                 lr=lr,
                 max_seq_length=max_seq_length,
@@ -215,6 +217,14 @@ def main():
     parser.add_argument("--cotrain-epochs", type=int, default=10)
     parser.add_argument("--finetune-max-epochs", type=int, default=100)
     parser.add_argument("--finetune-patience", type=int, default=5)
+    parser.add_argument(
+        "--stopping-strategy", type=str, default="baseline",
+        choices=[
+            "baseline", "no_early_stopping", "per_class_patience",
+            "weighted_macro_f1", "balanced_dev", "scaled_threshold",
+        ],
+        help="Phase 3 early stopping strategy (default: baseline)",
+    )
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max-seq-length", type=int, default=128)
@@ -233,6 +243,7 @@ def main():
         cotrain_epochs=args.cotrain_epochs,
         finetune_max_epochs=args.finetune_max_epochs,
         finetune_patience=args.finetune_patience,
+        stopping_strategy=args.stopping_strategy,
         batch_size=args.batch_size,
         lr=args.lr,
         max_seq_length=args.max_seq_length,

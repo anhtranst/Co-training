@@ -197,7 +197,7 @@ This cross-weighting is the core of co-training — each model guides the other 
 
 **Goal**: Adapt the co-trained models to the clean labeled data.
 
-Each co-trained model fine-tunes on its respective labeled split (Model 1 on D_l1, Model 2 on D_l2) with **early stopping** based on dev-set macro-F1 (patience = 5 epochs). This corrects any remaining bias from pseudo-label noise.
+Each co-trained model fine-tunes on its respective labeled split (Model 1 on D_l1, Model 2 on D_l2) with **early stopping** on the dev set (patience = 5 epochs). The stopping criterion is configurable via `--stopping-strategy` with six options: `baseline` (ensemble macro-F1, default), `no_early_stopping` (run all epochs), `per_class_patience` (stop only when every class plateaus), `weighted_macro_f1` (rare-class-weighted metric), `balanced_dev` (resampled dev set), and `scaled_threshold` (imbalance-scaled improvement threshold). This corrects any remaining bias from pseudo-label noise.
 
 **Final evaluation** uses **ensemble prediction**: average the softmax probabilities from both models, then take the argmax.
 
@@ -364,6 +364,7 @@ This reads pseudo-labels from `data/pseudo-labelled/llama-3/` and writes results
 | `--cotrain-epochs`      | Phase 2 epochs                      | `10`                            |
 | `--finetune-max-epochs` | Phase 3 max epochs                  | `100`                           |
 | `--finetune-patience`   | Early stopping patience             | `5`                             |
+| `--stopping-strategy`  | Phase 3 early stopping strategy (`baseline`, `no_early_stopping`, `per_class_patience`, `weighted_macro_f1`, `balanced_dev`, `scaled_threshold`) | `baseline` |
 | `--batch-size`          | Training batch size                 | `32`                            |
 | `--lr`                  | Learning rate                       | `2e-5`                          |
 | `--max-seq-length`      | Max token sequence length           | `128`                           |
@@ -379,6 +380,8 @@ Three Jupyter notebooks are provided in the `Notebooks/` directory:
 | `01_kaikoura_experiment.ipynb`      | Step-by-step walkthrough of the full pipeline on one event (Kaikoura Earthquake). Includes class distributions, per-epoch probability tracking, training curves, and per-class F1 charts.                                                                         |
 | `02_all_disasters_experiment.ipynb` | Runs all 120 experiments (10 events x 4 budgets x 3 seeds) with resume support. Contains cross-disaster summary tables, line plots, and heatmaps.                                                                                                                 |
 | `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{RUN_NAME}/` to enable side-by-side comparison across runs. |
+| `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/quick-stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
+| `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 
 All notebooks support **resume** — if interrupted, they skip experiments that already have `metrics.json` files.
 
@@ -449,6 +452,7 @@ Results are saved to `results/{event}/{budget}_set{seed}/metrics.json` (or `resu
   "dev_error_rate": 33.10,
   "dev_macro_f1": 0.5023,
   "dev_ece": 0.075,
+  "stopping_strategy": "baseline",
   "lambda1_mean": 0.7234,
   "lambda1_std": 0.1456,
   "lambda2_mean": 0.5891,
@@ -465,6 +469,7 @@ Results are saved to `results/{event}/{budget}_set{seed}/metrics.json` (or `resu
 | `dev_error_rate`               | Error rate on development set (%)      |
 | `dev_macro_f1`                 | Macro-averaged F1 on development set   |
 | `dev_ece`                      | Expected Calibration Error on dev set  |
+| `stopping_strategy`            | Phase 3 early stopping strategy used   |
 | `lambda1_mean` / `lambda1_std` | Statistics of optimistic weights       |
 | `lambda2_mean` / `lambda2_std` | Statistics of conservative weights     |
 
@@ -485,20 +490,23 @@ lg_cotrain/                          # Main package
 ├── run_experiment.py                # CLI entry point (single + batch mode)
 ├── run_all.py                       # Batch runner: all budget x seed_set experiments for one event
 ├── dashboard.py                     # HTML dashboard generator (auto-discovery, multi-tab)
-├── utils.py                         # Seed setting, logging, EarlyStopping, device selection
+├── utils.py                         # Seed setting, logging, EarlyStopping + alternative stopping classes, device selection
 ├── weight_tracker.py                # Per-sample probability tracking and lambda weight computation
 └── requirements.txt                 # Python dependencies
 
 Notebooks/
-├── 01_kaikoura_experiment.ipynb     # Step-by-step pipeline walkthrough with visualizations
-├── 02_all_disasters_experiment.ipynb # Full 120-experiment run (preserved results)
-└── 03_all_disasters_rerun.ipynb     # Re-run with configurable pseudo-label source + output folder
+├── 01_kaikoura_experiment.ipynb                 # Step-by-step pipeline walkthrough with visualizations
+├── 02_all_disasters_experiment.ipynb            # Full 120-experiment run (preserved results)
+├── 03_all_disasters_rerun.ipynb                 # Re-run with configurable pseudo-label source + output folder
+├── 04_alternative_stopping_strategies.ipynb     # Quick comparison of stopping strategies (budget=50, seed=1)
+└── 05_stopping_strategies_full_run.ipynb        # Full sweep across all strategies (720 runs)
 
-tests/                               # 303 tests across 12 test files
+tests/                               # 356 tests across 13 test files
 ├── conftest.py                      # Shared pytest fixtures
 ├── test_config.py                   # Config dataclass path computation and defaults (25 tests)
 ├── test_dashboard.py                # Dashboard HTML generation, auto-discovery, multi-tab (62 tests)
 ├── test_data_loading.py             # Data loading, label encoding, class detection (28 tests)
+├── test_early_stopping.py           # PerClassEarlyStopping, EarlyStoppingWithDelta, class weight helpers (26 tests)
 ├── test_evaluate.py                 # Metric computation, ECE, ensemble (28 tests)
 ├── test_model.py                    # BertClassifier forward/predict_proba (4 tests)
 ├── test_notebook.py                 # Notebook 01 + 03 structure and content validation (56 tests)
@@ -507,7 +515,7 @@ tests/                               # 303 tests across 12 test files
 ├── test_run_experiment.py           # CLI argument parsing and forwarding (12 tests)
 ├── test_trainer.py                  # Full pipeline integration test (4 tests)
 ├── test_utils.py                    # Seed, EarlyStopping, device (13 tests)
-└── test_weight_tracker.py           # Lambda weight computation, seeding (24 tests)
+└── test_weight_tracker.py           # Lambda weight computation, seeding (31 tests)
 
 docs/
 └── Cornelia etal2025-Cotraining.pdf # Reference paper
@@ -565,20 +573,21 @@ python -m unittest tests/test_evaluate.py
 
 ### Test Coverage Summary
 
-| Test File                | Tests | What It Covers                                                  |
-| ------------------------ | ----- | --------------------------------------------------------------- |
-| `test_config.py`         | 25    | Path computation, defaults, pseudo-label source                 |
-| `test_dashboard.py`      | 62    | HTML generation, event discovery, multi-tab, summary cards      |
-| `test_data_loading.py`   | 28    | TSV/CSV loading, label encoding, class detection, D_LG building |
-| `test_evaluate.py`       | 28    | Error rate, macro-F1, per-class F1, ECE, ensemble predict       |
-| `test_model.py`          | 4     | BertClassifier forward pass, predict_proba                      |
-| `test_notebook.py`       | 56    | Notebook 01 + 03 structure, imports, content, cell types        |
-| `test_notebook_02.py`    | 22    | Notebook 02 structure and content                               |
-| `test_run_all.py`        | 25    | Batch runner, custom budgets/seeds, pseudo-label forwarding     |
-| `test_run_experiment.py` | 12    | CLI parsing, single/batch modes, argument forwarding            |
-| `test_trainer.py`        | 4     | Full 3-phase pipeline integration                               |
-| `test_utils.py`          | 13    | Seed reproducibility, EarlyStopping, device detection           |
-| `test_weight_tracker.py` | 24    | Confidence, variability, lambda computation, tracker seeding    |
+| Test File                   | Tests | What It Covers                                                        |
+| --------------------------- | ----- | --------------------------------------------------------------------- |
+| `test_config.py`            | 25    | Path computation, defaults, pseudo-label source                       |
+| `test_dashboard.py`         | 62    | HTML generation, event discovery, multi-tab, summary cards            |
+| `test_data_loading.py`      | 28    | TSV/CSV loading, label encoding, class detection, D_LG building       |
+| `test_early_stopping.py`    | 26    | PerClassEarlyStopping, EarlyStoppingWithDelta, class weight helpers   |
+| `test_evaluate.py`          | 28    | Error rate, macro-F1, per-class F1, ECE, ensemble predict             |
+| `test_model.py`             | 4     | BertClassifier forward pass, predict_proba                            |
+| `test_notebook.py`          | 56    | Notebook 01 + 03 structure, imports, content, cell types              |
+| `test_notebook_02.py`       | 22    | Notebook 02 structure and content                                     |
+| `test_run_all.py`           | 25    | Batch runner, custom budgets/seeds, pseudo-label forwarding           |
+| `test_run_experiment.py`    | 12    | CLI parsing, single/batch modes, argument forwarding                  |
+| `test_trainer.py`           | 4     | Full 3-phase pipeline integration                                     |
+| `test_utils.py`             | 13    | Seed reproducibility, EarlyStopping, device detection                 |
+| `test_weight_tracker.py`    | 31    | Confidence, variability, lambda computation, tracker seeding          |
 
 ---
 
@@ -603,6 +612,10 @@ python -m unittest tests/test_evaluate.py
 - **Resume support**: Both `run_all_experiments()` and the notebooks skip experiments whose `metrics.json` already exists, making it safe to restart after crashes.
 
 - **Dependency injection for testing**: `run_all_experiments()` accepts `_trainer_cls` and `_on_experiment_done` parameters, allowing tests to inject mock trainers without importing torch.
+
+- **Configurable early stopping strategy**: The `stopping_strategy` field in `LGCoTrainConfig` (default `"baseline"`) selects how Phase 3 decides when to stop. Six strategies are supported: standard patience on ensemble macro-F1, no early stopping, per-class patience, rare-class-weighted metric, resampled dev set, and imbalance-scaled improvement threshold. Pass `--stopping-strategy` on the CLI to switch strategies without code changes.
+
+- **Paper-aligned Phase 1 → Phase 2 seeding**: `WeightTracker.seed_from_last_epoch()` seeds Phase 2 with only the final Phase 1 epoch's probabilities, matching Algorithm 1 in the paper. The earlier `seed_from_tracker()` (full-history copy) is retained for reference.
 
 ---
 

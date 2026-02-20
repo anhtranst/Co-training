@@ -86,9 +86,10 @@ class WeightTracker:
     def seed_from_tracker(cls, source: "WeightTracker") -> "WeightTracker":
         """Create a new tracker pre-seeded with another tracker's full history.
 
-        Used to carry Phase 1 probability history into Phase 2, so that
-        initial lambda weights retain the confidence/variability split
-        computed across all Phase 1 epochs (per Algorithm 1 in the paper).
+        Copies the full epoch history from source into a new tracker.
+        Note: this carries ALL Phase 1 epochs into Phase 2, which differs
+        from Algorithm 1 (which seeds with only the final epoch).
+        See seed_from_last_epoch() for the paper-aligned variant.
         """
         new_tracker = cls(source.num_samples)
         for probs in source.prob_history:
@@ -96,6 +97,23 @@ class WeightTracker:
                 new_tracker.prob_history.append(probs.copy())
             else:
                 new_tracker.prob_history.append(list(probs))
+        return new_tracker
+
+    @classmethod
+    def seed_from_last_epoch(cls, source: "WeightTracker") -> "WeightTracker":
+        """Create a new tracker seeded with only the source's final epoch.
+
+        Per Algorithm 1 in the paper: the final Phase 1 epoch's probabilities
+        serve as the single initial data point for Phase 2 confidence/variability
+        tracking. Variability starts at 0 and becomes meaningful only after Phase 2
+        records additional epochs.
+        """
+        new_tracker = cls(source.num_samples)
+        last_probs = source.prob_history[-1]
+        if HAS_NUMPY and isinstance(last_probs, np.ndarray):
+            new_tracker.prob_history.append(last_probs.copy())
+        else:
+            new_tracker.prob_history.append(list(last_probs))
         return new_tracker
 
     @property
