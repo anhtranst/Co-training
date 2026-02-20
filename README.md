@@ -197,9 +197,35 @@ This cross-weighting is the core of co-training — each model guides the other 
 
 **Goal**: Adapt the co-trained models to the clean labeled data.
 
-Each co-trained model fine-tunes on its respective labeled split (Model 1 on D_l1, Model 2 on D_l2) with **early stopping** on the dev set (patience = 5 epochs). The stopping criterion is configurable via `--stopping-strategy` with six options: `baseline` (ensemble macro-F1, default), `no_early_stopping` (run all epochs), `per_class_patience` (stop only when every class plateaus), `weighted_macro_f1` (rare-class-weighted metric), `balanced_dev` (resampled dev set), and `scaled_threshold` (imbalance-scaled improvement threshold). This corrects any remaining bias from pseudo-label noise.
+Each co-trained model fine-tunes on its respective labeled split (Model 1 on D_l1, Model 2 on D_l2) with **early stopping** on the dev set (patience = 5 epochs, configurable). This corrects any remaining bias from pseudo-label noise.
 
 **Final evaluation** uses **ensemble prediction**: average the softmax probabilities from both models, then take the argmax.
+
+#### Early Stopping Strategies
+
+The stopping criterion is selected with `--stopping-strategy`. All six strategies restore the best-ever model checkpoint when training ends, so the final model is never the last epoch but always the peak-performance epoch.
+
+The **core problem** that alternatives address: on imbalanced disaster datasets, majority classes (e.g. `not_humanitarian`) converge quickly and plateau macro-F1, causing `baseline` to stop before rare classes (e.g. `missing_or_found_people`) have finished learning.
+
+| Strategy | How it decides to stop | Best used when |
+| --- | --- | --- |
+| `baseline` | Stops when **ensemble macro-F1** on the full dev set has not improved for `patience` epochs. Both models must independently exhaust patience. | Balanced class distributions; a good starting point for any event. |
+| `no_early_stopping` | Runs **all `finetune_max_epochs`** (default 100) and restores the best checkpoint seen across all epochs. Never stops early. | Diagnosing whether `baseline` stopped too soon; provides an upper-bound reference for other strategies. |
+| `per_class_patience` | Tracks F1 for **each class independently**. Stops only when **every** class has individually plateaued (patience exhausted per class). Checkpoints on improvement of the mean per-class F1. | Highly imbalanced events where rare classes are still improving long after majority classes plateau. |
+| `weighted_macro_f1` | Computes a **rare-class-weighted** stopping metric: each class's F1 is multiplied by its inverse frequency (normalized to mean weight = 1.0), so rare classes contribute proportionally more to the stopping signal. | Events with a few dominant classes and several rare ones — rare-class improvements are not washed out by majority-class plateaus. |
+| `balanced_dev` | Resamples the dev set to **equal class counts** (down-sampled to the smallest class) before computing the stopping metric. The full dev set is still used for logging. | Events with very large majority classes that dominate raw macro-F1; equal representation makes the stopping signal sensitive to all classes equally. |
+| `scaled_threshold` | Requires a **minimum improvement delta** before resetting patience. The delta scales with the class imbalance ratio (`max_freq / min_freq`): a ratio of 1 gives `delta = 0.001`; a ratio of 10 gives `delta = 0.01` (capped at 20×). | Highly imbalanced events where tiny noise fluctuations in macro-F1 can spuriously reset patience and delay stopping. |
+
+```
+    Which strategy fires earliest vs latest (typical ordering):
+
+    baseline  ──────────────────────►  stops ~patience epochs after F1 peaks
+    weighted_macro_f1 ───────────────►  similar to baseline but shifts weight to rare classes
+    balanced_dev ────────────────────►  similar, resampling equalises class influence
+    scaled_threshold ────────────────►  stops later when fluctuations stay below min_delta
+    per_class_patience ──────────────►  stops latest: waits for the slowest class
+    no_early_stopping ───────────────►  never stops early (runs all epochs)
+```
 
 ```
     Ensemble Prediction
