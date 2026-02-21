@@ -67,8 +67,13 @@ def discover_result_sets(results_root):
     if not root.is_dir():
         return hierarchy
 
+    # Directories that are not model result sets (handled as special tabs).
+    _RESERVED_DIRS = {"optuna"}
+
     for model_dir in sorted(root.iterdir()):
         if not model_dir.is_dir() or model_dir.name.startswith((".", "_")):
+            continue
+        if model_dir.name in _RESERVED_DIRS:
             continue
         model_entry = {}
         for type_dir in sorted(model_dir.iterdir()):
@@ -85,6 +90,24 @@ def discover_result_sets(results_root):
             hierarchy[model_dir.name] = model_entry
 
     return hierarchy
+
+
+def load_optuna_results(results_root):
+    """Load optuna_results.json if it exists under *results_root*/optuna/.
+
+    Returns the parsed dict or *None* if the file is missing or malformed.
+    """
+    path = Path(results_root) / "optuna" / "optuna_results.json"
+    if not path.is_file():
+        return None
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        if "study_name" not in data or "trials" not in data:
+            return None
+        return data
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def collect_all_metrics(results_root):
@@ -1230,6 +1253,150 @@ def _render_data_tab(data_stats):
     return f'<div class="content">{"".join(sections)}{_render_data_guide()}</div>'
 
 
+def _render_optuna_tab(optuna_data):
+    """Render the Optuna hyperparameter tuning tab HTML.
+
+    *optuna_data* is the parsed dict from ``optuna_results.json``.
+    """
+    study_name = optuna_data.get("study_name", "N/A")
+    n_trials = optuna_data.get("n_trials", 0)
+    best_trial = optuna_data.get("best_trial", {})
+    paper_defaults = optuna_data.get("paper_defaults", {})
+    search_space = optuna_data.get("search_space", {})
+    trials = optuna_data.get("trials", [])
+
+    completed = sum(1 for t in trials if t.get("state") == "COMPLETE")
+    pruned = sum(1 for t in trials if t.get("state") == "PRUNED")
+
+    best_f1 = best_trial.get("mean_dev_macro_f1")
+    best_f1_str = f"{best_f1:.4f}" if best_f1 is not None else "N/A"
+    best_num = best_trial.get("number", "N/A")
+
+    # --- Summary cards ---
+    cards = (
+        '<div class="cards">'
+        f'<div class="card"><div class="label">Study</div>'
+        f'<div class="value" style="font-size:20px;">{study_name}</div></div>'
+        f'<div class="card"><div class="label">Total Trials</div>'
+        f'<div class="value">{n_trials}</div>'
+        f'<div class="sub">{completed} completed, {pruned} pruned</div></div>'
+        f'<div class="card"><div class="label">Best Trial</div>'
+        f'<div class="value">#{best_num}</div>'
+        f'<div class="sub">mean dev macro-F1: {best_f1_str}</div></div>'
+        '</div>'
+    )
+
+    # --- Best hyperparameters vs paper defaults ---
+    best_params = best_trial.get("params", {})
+    param_rows = []
+    for p in ["lr", "batch_size", "cotrain_epochs", "finetune_patience"]:
+        bv = best_params.get(p)
+        pv = paper_defaults.get(p)
+        if p == "lr":
+            bs = f"{bv:.2e}" if bv is not None else "N/A"
+            ps = f"{pv:.0e}" if pv is not None else "N/A"
+        else:
+            bs = str(bv) if bv is not None else "N/A"
+            ps = str(pv) if pv is not None else "N/A"
+        diff = ' style="background:#fff3cd;"' if bv is not None and pv is not None and bv != pv else ""
+        param_rows.append(
+            f"<tr><td>{p}</td><td{diff}><b>{bs}</b></td><td>{ps}</td></tr>"
+        )
+
+    best_html = (
+        '<div class="table-section">'
+        '<h2>Best Hyperparameters vs Paper Defaults</h2>'
+        '<p class="hint">Highlighted cells differ from the paper\'s default values</p>'
+        '<table><thead><tr><th>Parameter</th><th>Optuna Best</th>'
+        '<th>Paper Default</th></tr></thead>'
+        f'<tbody>{"".join(param_rows)}</tbody></table></div>'
+    )
+
+    # --- Search space ---
+    space_rows = []
+    for p, rng in search_space.items():
+        if isinstance(rng, list):
+            rng_str = "[" + ", ".join(str(v) for v in rng) + "]"
+        else:
+            rng_str = str(rng)
+        space_rows.append(f"<tr><td>{p}</td><td>{rng_str}</td></tr>")
+
+    space_html = (
+        '<div class="table-section">'
+        '<h2>Search Space</h2>'
+        '<table><thead><tr><th>Parameter</th><th>Range</th></tr></thead>'
+        f'<tbody>{"".join(space_rows)}</tbody></table></div>'
+    )
+
+    # --- All trials table ---
+    trial_rows = []
+    for t in trials:
+        t_num = t.get("number", "?")
+        t_state = t.get("state", "UNKNOWN")
+        t_params = t.get("params", {})
+        t_f1 = t.get("mean_dev_macro_f1")
+        t_dur = t.get("duration_seconds")
+
+        if t_state == "COMPLETE":
+            st = 'style="color:#155724;font-weight:600;"'
+        elif t_state == "PRUNED":
+            st = 'style="color:#856404;"'
+        else:
+            st = 'style="color:#721c24;"'
+
+        if t_f1 is not None:
+            f1_cls = _f1_class(t_f1)
+            f1_td = f'<td class="{f1_cls}" data-val="{t_f1:.6f}">{t_f1:.4f}</td>'
+        else:
+            f1_td = '<td class="cell-pending">---</td>'
+
+        if t_dur is not None:
+            if t_dur < 60:
+                dur_s = f"{t_dur:.0f}s"
+            elif t_dur < 3600:
+                dur_s = f"{t_dur / 60:.1f}min"
+            else:
+                dur_s = f"{t_dur / 3600:.1f}h"
+            dur_td = f'<td data-val="{t_dur:.1f}">{dur_s}</td>'
+        else:
+            dur_td = '<td class="cell-pending">---</td>'
+
+        lr_v = t_params.get("lr")
+        lr_s = f"{lr_v:.2e}" if lr_v is not None else "---"
+
+        row_cls = ' class="mean-row"' if t_num == best_num else ""
+        trial_rows.append(
+            f"<tr{row_cls}>"
+            f'<td data-val="{t_num}">{t_num}</td>'
+            f"<td {st}>{t_state}</td>"
+            f"<td>{lr_s}</td>"
+            f'<td>{t_params.get("batch_size", "---")}</td>'
+            f'<td>{t_params.get("cotrain_epochs", "---")}</td>'
+            f'<td>{t_params.get("finetune_patience", "---")}</td>'
+            f"{f1_td}{dur_td}</tr>"
+        )
+
+    trials_html = (
+        '<div class="table-section">'
+        f'<h2>All Trials</h2>'
+        f'<p class="hint">{len(trials)} trials &middot; best trial highlighted</p>'
+        '<table><thead><tr>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',0)">#</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',1)">State</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',2)">lr</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',3)">batch_size</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',4)">cotrain_epochs</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',5)">finetune_patience</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',6)">Mean Dev F1</th>'
+        '<th class="sortable" onclick="sortAllTable(\'optuna\',7)">Duration</th>'
+        '</tr></thead>'
+        f'<tbody id="all-tbody-optuna">{"".join(trial_rows)}</tbody>'
+        '</table></div>'
+    )
+
+    return f'<div class="content">{cards}{best_html}{space_html}{trials_html}</div>'
+
+
 def _render_tab_content(metrics, results_root, tab_id="default"):
     """Render the full dashboard body for a single result set / tab."""
     events = discover_events(metrics) or DEFAULT_EVENTS
@@ -1368,7 +1535,7 @@ def _esc(name):
     return name.replace("&", "&amp;").replace('"', "&quot;").replace("'", "\\'")
 
 
-def generate_html_multi(result_sets, data_root=None):
+def generate_html_multi(result_sets, data_root=None, optuna_data=None):
     """Generate multi-tab HTML dashboard with 3-level nested tabs.
 
     Args:
@@ -1378,6 +1545,7 @@ def generate_html_multi(result_sets, data_root=None):
 
         data_root: path to the data/ directory. Auto-detected from repo root
             if *None*.
+        optuna_data: parsed dict from ``optuna_results.json`` (or *None*).
     """
     if data_root is None:
         data_root = str(_find_repo_root() / "data")
@@ -1394,6 +1562,17 @@ def generate_html_multi(result_sets, data_root=None):
         f'<div id="l1-data-analysis" class="l1-content active">\n'
         f'{_render_data_tab(data_stats)}\n</div>'
     ]
+
+    # Optuna tab (second special tab, only if data exists)
+    if optuna_data is not None:
+        l1_buttons.append(
+            '<button class="tab" data-tab="optuna" '
+            "onclick=\"showL1Tab('optuna')\">Optuna</button>"
+        )
+        l1_divs.append(
+            f'<div id="l1-optuna" class="l1-content">\n'
+            f'{_render_optuna_tab(optuna_data)}\n</div>'
+        )
 
     total_metrics = 0
 
@@ -1529,6 +1708,7 @@ def main():
 
     output = args.output or str(Path(args.results_root) / "dashboard.html")
     result_sets = discover_result_sets(args.results_root)
+    optuna_data = load_optuna_results(args.results_root)
 
     if not result_sets:
         # No nested hierarchy — treat root as a single flat result set
@@ -1538,7 +1718,9 @@ def main():
         n_models = 0
     else:
         # Hierarchical result sets: 3-level nested tabs
-        html = generate_html_multi(result_sets, data_root=args.data_root)
+        html = generate_html_multi(
+            result_sets, data_root=args.data_root, optuna_data=optuna_data,
+        )
         total = sum(
             len(collect_all_metrics(path))
             for model_types in result_sets.values()

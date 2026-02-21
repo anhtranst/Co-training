@@ -458,12 +458,13 @@ The dashboard is a self-contained HTML file with:
 - All-results table with sorting by any column
 - Lambda weight analysis table
 - **3-level nested tab view** when multiple result sets exist — Level 1 (model), Level 2 (experiment type), Level 3 (experiment name)
+- **Optuna tab** (appears between Data Analysis and model tabs when `results/optuna/optuna_results.json` exists) — shows best hyperparameters, search space, and all trial results
 
 ```
     Dashboard Layout (Multi-Tab Mode — 3-Level Nested Tabs)
 
     ┌───────────────────────────────────────────────────────┐
-    │  [Data Analysis] [ gpt-4o ] [ llama-3 ]               │  ◄─ Level 1 (model)
+    │  [Data Analysis] [Optuna] [ gpt-4o ] [ llama-3 ]     │  ◄─ Level 1 (model)
     ├───────────────────────────────────────────────────────┤
     │  [ quick-stop ] [ stop ] [ test ]                     │  ◄─ Level 2 (type)
     ├───────────────────────────────────────────────────────┤
@@ -560,7 +561,7 @@ Notebooks/
 tests/                               # 380+ tests across 14 test files
 ├── conftest.py                      # Shared pytest fixtures
 ├── test_config.py                   # Config dataclass path computation and defaults (25 tests)
-├── test_dashboard.py                # Dashboard HTML generation, auto-discovery, multi-tab (62 tests)
+├── test_dashboard.py                # Dashboard HTML generation, auto-discovery, multi-tab, Optuna tab (105 tests)
 ├── test_data_loading.py             # Data loading, label encoding, class detection (28 tests)
 ├── test_early_stopping.py           # PerClassEarlyStopping, EarlyStoppingWithDelta, class weight helpers (26 tests)
 ├── test_evaluate.py                 # Metric computation, ECE, ensemble (28 tests)
@@ -643,7 +644,7 @@ python -m unittest tests/test_evaluate.py
 | Test File                   | Tests | What It Covers                                                        |
 | --------------------------- | ----- | --------------------------------------------------------------------- |
 | `test_config.py`            | 25    | Path computation, defaults, pseudo-label source                       |
-| `test_dashboard.py`         | 85    | HTML generation, event discovery, 3-level nested tabs, summary cards  |
+| `test_dashboard.py`         | 105   | HTML generation, event discovery, 3-level nested tabs, Optuna tab     |
 | `test_data_loading.py`      | 28    | TSV/CSV loading, label encoding, class detection, D_LG building       |
 | `test_early_stopping.py`    | 26    | PerClassEarlyStopping, EarlyStoppingWithDelta, class weight helpers   |
 | `test_evaluate.py`          | 28    | Error rate, macro-F1, per-class F1, ECE, ensemble predict             |

@@ -17,6 +17,7 @@ from lg_cotrain.dashboard import (
     DEFAULT_EVENTS,
     EVENTS,
     _render_data_tab,
+    _render_optuna_tab,
     build_lambda_pivot,
     build_overall_means,
     build_pivot_data,
@@ -30,6 +31,7 @@ from lg_cotrain.dashboard import (
     generate_html,
     generate_html_multi,
     get_event_class_count,
+    load_optuna_results,
 )
 from lg_cotrain.run_all import BUDGETS, SEED_SETS
 
@@ -785,6 +787,220 @@ class TestDashboardCLIDataRoot(unittest.TestCase):
                 from lg_cotrain.dashboard import main
                 main()
             self.assertTrue((Path(tmpdir) / "dashboard.html").exists())
+
+
+def _make_optuna_results():
+    """Build a minimal optuna_results.json dict for testing."""
+    return {
+        "study_name": "lg_cotrain_global",
+        "n_trials": 2,
+        "best_trial": {
+            "number": 1,
+            "mean_dev_macro_f1": 0.6234,
+            "params": {
+                "lr": 3e-5,
+                "batch_size": 16,
+                "cotrain_epochs": 15,
+                "finetune_patience": 7,
+            },
+        },
+        "paper_defaults": {
+            "lr": 2e-5,
+            "batch_size": 32,
+            "cotrain_epochs": 10,
+            "finetune_patience": 5,
+        },
+        "search_space": {
+            "lr": "1e-5 to 1e-3 (log-uniform)",
+            "batch_size": [8, 16, 32, 64],
+            "cotrain_epochs": "5 to 20",
+            "finetune_patience": "4 to 10",
+        },
+        "trials": [
+            {
+                "number": 0,
+                "state": "COMPLETE",
+                "params": {"lr": 1e-4, "batch_size": 32,
+                           "cotrain_epochs": 10, "finetune_patience": 5},
+                "mean_dev_macro_f1": 0.55,
+                "duration_seconds": 123.4,
+            },
+            {
+                "number": 1,
+                "state": "COMPLETE",
+                "params": {"lr": 3e-5, "batch_size": 16,
+                           "cotrain_epochs": 15, "finetune_patience": 7},
+                "mean_dev_macro_f1": 0.6234,
+                "duration_seconds": 456.7,
+            },
+        ],
+    }
+
+
+class TestLoadOptunaResults(unittest.TestCase):
+    """Tests for load_optuna_results()."""
+
+    def test_returns_none_when_no_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.assertIsNone(load_optuna_results(tmpdir))
+
+    def test_returns_none_when_dir_exists_but_no_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / "optuna").mkdir()
+            self.assertIsNone(load_optuna_results(tmpdir))
+
+    def test_returns_none_for_malformed_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            d = Path(tmpdir) / "optuna"
+            d.mkdir()
+            (d / "optuna_results.json").write_text("{invalid")
+            self.assertIsNone(load_optuna_results(tmpdir))
+
+    def test_returns_none_for_missing_required_keys(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            d = Path(tmpdir) / "optuna"
+            d.mkdir()
+            (d / "optuna_results.json").write_text('{"foo": "bar"}')
+            self.assertIsNone(load_optuna_results(tmpdir))
+
+    def test_loads_valid_results(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            d = Path(tmpdir) / "optuna"
+            d.mkdir()
+            data = _make_optuna_results()
+            (d / "optuna_results.json").write_text(json.dumps(data))
+            result = load_optuna_results(tmpdir)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["study_name"], "lg_cotrain_global")
+        self.assertEqual(len(result["trials"]), 2)
+
+
+class TestRenderOptunaTab(unittest.TestCase):
+    """Tests for _render_optuna_tab()."""
+
+    def test_returns_string(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIsInstance(html, str)
+
+    def test_contains_study_name(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn("lg_cotrain_global", html)
+
+    def test_contains_best_trial_info(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn("#1", html)
+        self.assertIn("0.6234", html)
+
+    def test_contains_paper_defaults(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn("Paper Default", html)
+
+    def test_contains_search_space(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn("Search Space", html)
+        self.assertIn("log-uniform", html)
+
+    def test_contains_trial_states(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn("COMPLETE", html)
+
+    def test_pruned_trial_shown(self):
+        data = _make_optuna_results()
+        data["trials"].append({
+            "number": 2, "state": "PRUNED",
+            "params": {"lr": 5e-4, "batch_size": 64,
+                       "cotrain_epochs": 5, "finetune_patience": 4},
+        })
+        data["n_trials"] = 3
+        html = _render_optuna_tab(data)
+        self.assertIn("PRUNED", html)
+        self.assertIn("1 pruned", html)
+
+    def test_sortable_columns(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn("sortAllTable('optuna'", html)
+        self.assertIn("all-tbody-optuna", html)
+
+    def test_highlights_best_trial_row(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        self.assertIn('class="mean-row"', html)
+
+    def test_highlights_param_differences(self):
+        html = _render_optuna_tab(_make_optuna_results())
+        # lr, batch_size, cotrain_epochs, finetune_patience all differ from defaults
+        self.assertIn('background:#fff3cd', html)
+
+
+class TestDiscoverResultSetsOptunaFiltered(unittest.TestCase):
+    """Ensure optuna directory is excluded from model result sets."""
+
+    def test_optuna_dir_not_in_result_sets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Normal model hierarchy
+            base = Path(tmpdir) / "gpt-4o" / "test" / "run-1"
+            _write_metric(str(base), _make_metric())
+            # Optuna directory
+            opt = Path(tmpdir) / "optuna" / "california_wildfires_2018" / "50_set1"
+            opt.mkdir(parents=True)
+            (opt / "metrics.json").write_text(json.dumps(_make_metric()))
+            result = discover_result_sets(tmpdir)
+        self.assertNotIn("optuna", result)
+        self.assertIn("gpt-4o", result)
+
+
+class TestGenerateHtmlMultiOptunaTab(unittest.TestCase):
+    """Optuna tab integration tests for generate_html_multi()."""
+
+    def test_optuna_tab_not_present_without_data(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"),
+                          _make_metric())
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(result_sets, data_root="/nonexistent")
+        self.assertNotIn('id="l1-optuna"', html)
+
+    def test_optuna_tab_present_with_data(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"),
+                          _make_metric())
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(
+                result_sets, data_root="/nonexistent",
+                optuna_data=_make_optuna_results(),
+            )
+        self.assertIn('id="l1-optuna"', html)
+        self.assertIn(">Optuna<", html)
+
+    def test_optuna_tab_between_data_and_model(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"),
+                          _make_metric())
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(
+                result_sets, data_root="/nonexistent",
+                optuna_data=_make_optuna_results(),
+            )
+        da_pos = html.find("Data Analysis")
+        optuna_pos = html.find(">Optuna<")
+        model_pos = html.find("gpt-4o")
+        self.assertGreater(da_pos, -1)
+        self.assertGreater(optuna_pos, -1)
+        self.assertGreater(model_pos, -1)
+        self.assertLess(da_pos, optuna_pos)
+        self.assertLess(optuna_pos, model_pos)
+
+    def test_optuna_content_in_tab(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"),
+                          _make_metric())
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(
+                result_sets, data_root="/nonexistent",
+                optuna_data=_make_optuna_results(),
+            )
+        self.assertIn("lg_cotrain_global", html)
+        self.assertIn("Best Hyperparameters", html)
+        self.assertIn("All Trials", html)
 
 
 if __name__ == "__main__":
