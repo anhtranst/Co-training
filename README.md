@@ -405,9 +405,9 @@ Three Jupyter notebooks are provided in the `Notebooks/` directory:
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `01_kaikoura_experiment.ipynb`      | Step-by-step walkthrough of the full pipeline on one event (Kaikoura Earthquake). Includes class distributions, per-epoch probability tracking, training curves, and per-class F1 charts.                                                                         |
 | `02_all_disasters_experiment.ipynb` | Runs all 120 experiments (10 events x 4 budgets x 3 seeds) with resume support. Contains cross-disaster summary tables, line plots, and heatmaps.                                                                                                                 |
-| `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{RUN_NAME}/` to enable side-by-side comparison across runs. |
-| `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/{pseudo_label_source}-quick-stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
-| `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/{pseudo_label_source}-stop-{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
+| `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{source}/test/{run_name}/` to enable side-by-side comparison across runs. |
+| `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/{source}/quick-stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
+| `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/{source}/stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 
 All notebooks support **resume** — if interrupted, they skip experiments that already have `metrics.json` files.
 
@@ -416,14 +416,14 @@ All notebooks support **resume** — if interrupted, they skip experiments that 
 Generate an HTML dashboard from experiment results:
 
 ```bash
-# From the default results directory
+# From the default results directory (auto-discovers 3-level hierarchy)
 python -m lg_cotrain.dashboard
 
 # From a specific results directory
-python -m lg_cotrain.dashboard --results-root results/gpt-4o-run1
+python -m lg_cotrain.dashboard --results-root results/
 
-# Multi-tab dashboard comparing multiple result sets
-# (auto-detected when results/ contains sub-folders with metrics)
+# Nested tab dashboard: model → type → experiment
+# (auto-detected from results/{model}/{type}/{experiment}/ structure)
 python -m lg_cotrain.dashboard --results-root results/
 ```
 
@@ -433,38 +433,42 @@ The dashboard is a self-contained HTML file with:
 - Pivot table grouped by budget showing mean/std across seeds per event
 - All-results table with sorting by any column
 - Lambda weight analysis table
-- **Multi-tab view** when multiple result sets exist (e.g., different pseudo-label sources)
+- **3-level nested tab view** when multiple result sets exist — Level 1 (model), Level 2 (experiment type), Level 3 (experiment name)
 
 ```
-    Dashboard Layout (Multi-Tab Mode)
+    Dashboard Layout (Multi-Tab Mode — 3-Level Nested Tabs)
 
-    ┌─────────────────────────────────────────────────┐
-    │  [ gpt-4o-run1 ] [ llama-3-run1 ] [ gpt-4o-v2 ]│  ◄─ Tab bar
-    ├─────────────────────────────────────────────────┤
-    │                                                 │
-    │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
-    │  │120 Exp │ │ 0.52   │ │ 34.2%  │ │ 0.082  │   │  ◄─ Summary cards
-    │  │ Total  │ │Avg F1  │ │Avg Err │ │Avg ECE │   │
-    │  └────────┘ └────────┘ └────────┘ └────────┘   │
-    │                                                 │
-    │  [ Pivot View ] [ All Results ]                 │  ◄─ View toggle
-    │                                                 │
-    │  ┌─────────────────────────────────────────┐    │
-    │  │ Budget │ Seed 1    │ Seed 2    │ Seed 3 │    │
-    │  │     5  │ 42.1 .481 │ 39.5 .503 │ ...    │    │  ◄─ Results table
-    │  │    10  │ 38.2 .521 │ 36.1 .540 │ ...    │    │
-    │  │    25  │ 33.5 .562 │ 32.0 .578 │ ...    │    │
-    │  │    50  │ 29.1 .601 │ 28.3 .612 │ ...    │    │
-    │  └─────────────────────────────────────────┘    │
-    │                                                 │
-    └─────────────────────────────────────────────────┘
+    ┌───────────────────────────────────────────────────────┐
+    │  [Data Analysis] [ gpt-4o ] [ llama-3 ]               │  ◄─ Level 1 (model)
+    ├───────────────────────────────────────────────────────┤
+    │  [ quick-stop ] [ stop ] [ test ]                     │  ◄─ Level 2 (type)
+    ├───────────────────────────────────────────────────────┤
+    │  [baseline] [no_early_stopping] [per_class_patience]  │  ◄─ Level 3 (experiment)
+    ├───────────────────────────────────────────────────────┤
+    │                                                       │
+    │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐         │
+    │  │120 Exp │ │ 0.52   │ │ 34.2%  │ │ 0.082  │         │  ◄─ Summary cards
+    │  │ Total  │ │Avg F1  │ │Avg Err │ │Avg ECE │         │
+    │  └────────┘ └────────┘ └────────┘ └────────┘         │
+    │                                                       │
+    │  [ Pivot View ] [ All Results ]                       │  ◄─ View toggle
+    │                                                       │
+    │  ┌─────────────────────────────────────────┐          │
+    │  │ Budget │ Seed 1    │ Seed 2    │ Seed 3 │          │
+    │  │     5  │ 42.1 .481 │ 39.5 .503 │ ...    │          │  ◄─ Results table
+    │  │    10  │ 38.2 .521 │ 36.1 .540 │ ...    │          │
+    │  │    25  │ 33.5 .562 │ 32.0 .578 │ ...    │          │
+    │  │    50  │ 29.1 .601 │ 28.3 .612 │ ...    │          │
+    │  └─────────────────────────────────────────┘          │
+    │                                                       │
+    └───────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Output Format
 
-Results are saved to `results/{event}/{budget}_set{seed}/metrics.json` (or `results/{run_name}/{event}/{budget}_set{seed}/metrics.json` when using `--output-folder`):
+Results are saved under a 3-level hierarchy: `results/{model}/{type}/{experiment}/{event}/{budget}_set{seed}/metrics.json` (e.g., `results/gpt-4o/quick-stop/baseline/canada_wildfires_2016/5_set1/metrics.json`):
 
 ```json
 {
@@ -515,7 +519,7 @@ lg_cotrain/                          # Main package
 ├── trainer.py                       # LGCoTrainer — orchestrates the 3-phase pipeline
 ├── run_experiment.py                # CLI entry point (single + batch mode)
 ├── run_all.py                       # Batch runner: all budget x seed_set experiments for one event
-├── dashboard.py                     # HTML dashboard generator (auto-discovery, multi-tab)
+├── dashboard.py                     # HTML dashboard generator (3-level nested tabs, auto-discovery)
 ├── utils.py                         # Seed setting, logging, EarlyStopping + alternative stopping classes, device selection
 ├── weight_tracker.py                # Per-sample probability tracking and lambda weight computation
 └── requirements.txt                 # Python dependencies
@@ -527,7 +531,7 @@ Notebooks/
 ├── 04_alternative_stopping_strategies.ipynb     # Quick comparison of stopping strategies (budget=50, seed=1)
 └── 05_stopping_strategies_full_run.ipynb        # Full sweep across all strategies (720 runs)
 
-tests/                               # 356 tests across 13 test files
+tests/                               # 359 tests across 13 test files
 ├── conftest.py                      # Shared pytest fixtures
 ├── test_config.py                   # Config dataclass path computation and defaults (25 tests)
 ├── test_dashboard.py                # Dashboard HTML generation, auto-discovery, multi-tab (62 tests)
@@ -548,6 +552,15 @@ docs/
 
 data/                                # Disaster event datasets
 results/                             # Experiment outputs + dashboard
+├── dashboard.html                   # Auto-generated HTML dashboard
+└── {model}/                         # e.g., gpt-4o
+    ├── quick-stop/                  # Quick stopping strategy experiments
+    │   └── {strategy}/              # e.g., baseline, per_class_patience
+    │       └── {event}/{budget}_set{seed}/metrics.json
+    ├── stop/                        # Full stopping strategy experiments
+    │   └── {strategy}/...
+    └── test/                        # General test runs
+        └── {run_name}/...           # e.g., run-1, run-2
 ```
 
 ### Module Dependency Graph
@@ -602,7 +615,7 @@ python -m unittest tests/test_evaluate.py
 | Test File                   | Tests | What It Covers                                                        |
 | --------------------------- | ----- | --------------------------------------------------------------------- |
 | `test_config.py`            | 25    | Path computation, defaults, pseudo-label source                       |
-| `test_dashboard.py`         | 62    | HTML generation, event discovery, multi-tab, summary cards            |
+| `test_dashboard.py`         | 85    | HTML generation, event discovery, 3-level nested tabs, summary cards  |
 | `test_data_loading.py`      | 28    | TSV/CSV loading, label encoding, class detection, D_LG building       |
 | `test_early_stopping.py`    | 26    | PerClassEarlyStopping, EarlyStoppingWithDelta, class weight helpers   |
 | `test_evaluate.py`          | 28    | Error rate, macro-F1, per-class F1, ECE, ensemble predict             |
@@ -633,7 +646,7 @@ python -m unittest tests/test_evaluate.py
 
 - **Configurable pseudo-label source**: The `pseudo_label_source` field in `LGCoTrainConfig` (default `"gpt-4o"`) determines which directory under `data/pseudo-labelled/` to read from, enabling experiments with different LLMs without code changes.
 
-- **Result set sub-folders**: Results can be stored in named sub-folders (`results/gpt-4o-run1/`, `results/llama-3-run1/`) for side-by-side comparison. The dashboard auto-discovers all result sets.
+- **3-level results hierarchy**: Results are organized in a 3-level folder structure (`results/{model}/{type}/{experiment}/`) instead of flat names. For example, `results/gpt-4o/quick-stop/baseline/` instead of `results/gpt-4o-quick-stop-baseline/`. The dashboard uses nested tab bars (model → type → experiment) to navigate without horizontal overflow.
 
 - **Resume support**: Both `run_all_experiments()` and the notebooks skip experiments whose `metrics.json` already exists, making it safe to restart after crashes.
 

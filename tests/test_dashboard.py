@@ -106,48 +106,52 @@ class TestDiscoverResultSets(unittest.TestCase):
     def test_empty_root(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = discover_result_sets(tmpdir)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0][0], "default")
+        self.assertEqual(result, {})
 
-    def test_legacy_flat_layout(self):
+    def test_three_level_hierarchy(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(tmpdir, _make_metric())
+            base = Path(tmpdir) / "gpt-4o" / "test" / "run-1"
+            _write_metric(str(base), _make_metric())
             result = discover_result_sets(tmpdir)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0][0], "default")
-        self.assertEqual(result[0][1], tmpdir)
+        self.assertIn("gpt-4o", result)
+        self.assertIn("test", result["gpt-4o"])
+        names = [name for name, _ in result["gpt-4o"]["test"]]
+        self.assertIn("run-1", names)
 
-    def test_sub_folders_discovered(self):
+    def test_multiple_experiments_in_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            run_a = Path(tmpdir) / "run-a"
-            run_b = Path(tmpdir) / "run-b"
-            _write_metric(str(run_a), _make_metric())
-            _write_metric(str(run_b), _make_metric(event="canada_wildfires_2016"))
+            for exp in ["run-1", "run-2"]:
+                base = Path(tmpdir) / "gpt-4o" / "test" / exp
+                _write_metric(str(base), _make_metric())
             result = discover_result_sets(tmpdir)
-        names = [name for name, _ in result]
-        self.assertIn("run-a", names)
-        self.assertIn("run-b", names)
-
-    def test_mixed_legacy_and_subfolders(self):
-        """Legacy flat layout + sub-folders both discovered."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Legacy: directly under root
-            _write_metric(tmpdir, _make_metric())
-            # Sub-folder
-            _write_metric(str(Path(tmpdir) / "run-2"), _make_metric())
-            result = discover_result_sets(tmpdir)
-        names = [name for name, _ in result]
-        self.assertIn("default", names)
+        names = [name for name, _ in result["gpt-4o"]["test"]]
+        self.assertIn("run-1", names)
         self.assertIn("run-2", names)
+
+    def test_multiple_types(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"), _make_metric())
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "quick-stop" / "baseline"), _make_metric())
+            result = discover_result_sets(tmpdir)
+        self.assertIn("test", result["gpt-4o"])
+        self.assertIn("quick-stop", result["gpt-4o"])
+
+    def test_empty_type_dir_included(self):
+        """An experiment type dir with no experiments is included with empty list."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"), _make_metric())
+            (Path(tmpdir) / "gpt-4o" / "stop").mkdir(parents=True)
+            result = discover_result_sets(tmpdir)
+        self.assertIn("stop", result["gpt-4o"])
+        self.assertEqual(result["gpt-4o"]["stop"], [])
 
     def test_non_result_dirs_ignored(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "valid-run"), _make_metric())
-            # Create a dir with no metrics.json
-            (Path(tmpdir) / "empty-dir").mkdir()
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"), _make_metric())
+            (Path(tmpdir) / "gpt-4o" / "test" / "empty-dir").mkdir(parents=True)
             result = discover_result_sets(tmpdir)
-        names = [name for name, _ in result]
-        self.assertIn("valid-run", names)
+        names = [name for name, _ in result["gpt-4o"]["test"]]
+        self.assertIn("run-1", names)
         self.assertNotIn("empty-dir", names)
 
 
@@ -446,39 +450,62 @@ class TestGenerateHtml(unittest.TestCase):
 
 
 class TestGenerateHtmlMulti(unittest.TestCase):
+    def _make_hierarchy(self, tmpdir, model="gpt-4o", exp_type="test", exp_name="run-1"):
+        """Helper: write metric under model/type/experiment and return discover result."""
+        base = Path(tmpdir) / model / exp_type / exp_name
+        _write_metric(str(base), _make_metric())
+        return discover_result_sets(tmpdir)
+
     def test_returns_valid_html(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "run-a"), _make_metric())
-            result_sets = discover_result_sets(tmpdir)
+            result_sets = self._make_hierarchy(tmpdir)
             html = generate_html_multi(result_sets)
         self.assertTrue(html.strip().startswith("<!DOCTYPE html>"))
 
-    def test_multiple_result_sets_has_tabs(self):
+    def test_has_level_1_tabs(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "run-a"), _make_metric())
-            _write_metric(str(Path(tmpdir) / "run-b"), _make_metric())
-            result_sets = discover_result_sets(tmpdir)
+            result_sets = self._make_hierarchy(tmpdir)
             html = generate_html_multi(result_sets)
-        self.assertIn("tab-bar", html)
-        self.assertIn("run-a", html)
-        self.assertIn("run-b", html)
-        self.assertIn("showTab", html)
+        self.assertIn("level-1", html)
+        self.assertIn("Data Analysis", html)
+        self.assertIn("gpt-4o", html)
+        self.assertIn("showL1Tab", html)
 
-    def test_single_result_set_still_works(self):
+    def test_has_level_2_tabs(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "only-run"), _make_metric())
+            result_sets = self._make_hierarchy(tmpdir)
+            html = generate_html_multi(result_sets)
+        self.assertIn("level-2", html)
+        self.assertIn("test", html)
+        self.assertIn("showL2Tab", html)
+
+    def test_has_level_3_tabs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for exp in ["run-1", "run-2"]:
+                _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / exp), _make_metric())
             result_sets = discover_result_sets(tmpdir)
             html = generate_html_multi(result_sets)
-        self.assertIn("only-run", html)
+        self.assertIn("level-3", html)
+        self.assertIn("run-1", html)
+        self.assertIn("run-2", html)
+        self.assertIn("showL3Tab", html)
 
     def test_tab_content_has_pivot_and_all(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "run-a"), _make_metric())
-            result_sets = discover_result_sets(tmpdir)
+            result_sets = self._make_hierarchy(tmpdir)
             html = generate_html_multi(result_sets)
         self.assertIn("Pivot Summary", html)
         self.assertIn("All Results", html)
         self.assertIn("Macro-F1 by Disaster", html)
+
+    def test_empty_type_shows_placeholder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self._make_hierarchy(tmpdir)
+            (Path(tmpdir) / "gpt-4o" / "stop").mkdir(parents=True)
+            result_sets = discover_result_sets(tmpdir)
+            html = generate_html_multi(result_sets)
+        self.assertIn("stop (empty)", html)
+        self.assertIn("No experiments yet", html)
 
 
 class TestDashboardCLI(unittest.TestCase):
@@ -509,16 +536,18 @@ class TestDashboardCLI(unittest.TestCase):
             self.assertIn("California Wildfires 2018", content)
 
     def test_multi_tab_cli(self):
-        """CLI with sub-folder structure produces multi-tab dashboard."""
+        """CLI with 3-level structure produces multi-tab dashboard."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "run-1"), _make_metric())
-            _write_metric(str(Path(tmpdir) / "run-2"), _make_metric())
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"), _make_metric())
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-2"), _make_metric())
             with patch("sys.argv", ["dashboard", "--results-root", tmpdir]):
                 from lg_cotrain.dashboard import main
                 main()
             content = (Path(tmpdir) / "dashboard.html").read_text()
+            self.assertIn("gpt-4o", content)
             self.assertIn("run-1", content)
             self.assertIn("run-2", content)
+            self.assertIn("level-1", content)
 
 
 class TestBackwardCompatibility(unittest.TestCase):
@@ -704,22 +733,23 @@ class TestGenerateHtmlMultiDataTab(unittest.TestCase):
     """Data Analysis tab integration tests for generate_html_multi()."""
 
     def test_data_analysis_is_first_tab(self):
-        """'Data Analysis' button must appear before any result-set tab in the HTML."""
+        """'Data Analysis' button must appear before any model tab in the HTML."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            _write_metric(str(Path(tmpdir) / "run-a"), _make_metric())
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"), _make_metric())
             result_sets = discover_result_sets(tmpdir)
             html = generate_html_multi(result_sets, data_root="/nonexistent/path")
         da_pos = html.find("Data Analysis")
-        run_a_pos = html.find("run-a")
+        model_pos = html.find("gpt-4o")
         self.assertGreater(da_pos, -1, "Data Analysis tab not found")
-        self.assertLess(da_pos, run_a_pos, "Data Analysis must precede result-set tabs")
+        self.assertLess(da_pos, model_pos, "Data Analysis must precede model tabs")
 
-    def test_data_tab_id_is_data_analysis(self):
-        """The data tab div must have id='tab-data-analysis'."""
+    def test_data_tab_id_is_l1_data_analysis(self):
+        """The data tab div must have id='l1-data-analysis'."""
         with tempfile.TemporaryDirectory() as tmpdir:
+            _write_metric(str(Path(tmpdir) / "gpt-4o" / "test" / "run-1"), _make_metric())
             result_sets = discover_result_sets(tmpdir)
             html = generate_html_multi(result_sets, data_root="/nonexistent/path")
-        self.assertIn('id="tab-data-analysis"', html)
+        self.assertIn('id="l1-data-analysis"', html)
 
 
 class TestGenerateHtmlDataTab(unittest.TestCase):

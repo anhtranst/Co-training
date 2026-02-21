@@ -53,25 +53,38 @@ def _has_metrics(path):
 def discover_result_sets(results_root):
     """Discover result set sub-folders under *results_root*.
 
-    Returns list of ``(name, path)`` tuples. If the root itself contains
-    event directories with ``metrics.json`` (legacy flat layout), it is
-    included as the "default" result set.
+    Scans a 3-level hierarchy: ``model / experiment_type / experiment_name``.
+    Returns a nested dict::
+
+        {model: {exp_type: [(exp_name, path), ...]}}
+
+    Empty experiment-type directories are included with an empty list so the
+    dashboard can display them as placeholder tabs.
     """
     root = Path(results_root)
-    result_sets = []
+    hierarchy = {}
 
-    # Check if root itself has the legacy flat layout
-    if _has_metrics(root):
-        result_sets.append(("default", str(root)))
+    if not root.is_dir():
+        return hierarchy
 
-    # Check sub-folders
-    if root.is_dir():
-        for child in sorted(root.iterdir()):
-            if child.is_dir() and child.name != "__pycache__":
-                if _has_metrics(child):
-                    result_sets.append((child.name, str(child)))
+    for model_dir in sorted(root.iterdir()):
+        if not model_dir.is_dir() or model_dir.name.startswith((".", "_")):
+            continue
+        model_entry = {}
+        for type_dir in sorted(model_dir.iterdir()):
+            if not type_dir.is_dir() or type_dir.name.startswith((".", "_")):
+                continue
+            experiments = []
+            for exp_dir in sorted(type_dir.iterdir()):
+                if not exp_dir.is_dir() or exp_dir.name.startswith((".", "_")):
+                    continue
+                if _has_metrics(exp_dir):
+                    experiments.append((exp_dir.name, str(exp_dir)))
+            model_entry[type_dir.name] = experiments
+        if model_entry:
+            hierarchy[model_dir.name] = model_entry
 
-    return result_sets if result_sets else [("default", str(root))]
+    return hierarchy
 
 
 def collect_all_metrics(results_root):
@@ -336,6 +349,7 @@ header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
          color: #e8e8e8; padding: 28px 40px; }
 header h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
 header p { font-size: 13px; opacity: 0.7; }
+/* Generic tab-bar (used by single-result generate_html) */
 .tab-bar { display: flex; gap: 0; padding: 0 40px; background: #1a1a2e;
            border-bottom: 2px solid #2d3adf; overflow-x: auto; }
 .tab-bar .tab { padding: 12px 24px; cursor: pointer; font-size: 14px;
@@ -343,9 +357,35 @@ header p { font-size: 13px; opacity: 0.7; }
                 color: #8888aa; transition: all 0.15s; white-space: nowrap; }
 .tab-bar .tab.active { color: #fff; border-bottom: 3px solid #2d3adf;
                        background: rgba(45,58,223,0.1); }
-.tab-bar .tab:hover:not(.active) { color: #bbb; }
+.tab-bar .tab:hover:not(.active):not(.disabled) { color: #bbb; }
+.tab-bar .tab.disabled { color: #555; cursor: default; opacity: 0.5; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
+/* Level-1 tab bar (model selector — dark header) */
+.tab-bar.level-1 { background: #1a1a2e; border-bottom: 2px solid #2d3adf; }
+.tab-bar.level-1 .tab { color: #8888aa; }
+.tab-bar.level-1 .tab.active { color: #fff; border-bottom: 3px solid #2d3adf;
+                                background: rgba(45,58,223,0.1); }
+/* Level-2 tab bar (experiment type — medium-dark) */
+.tab-bar.level-2 { background: #252545; border-bottom: 2px solid #4a4aaf; }
+.tab-bar.level-2 .tab { padding: 10px 20px; font-size: 13px; color: #9999bb; }
+.tab-bar.level-2 .tab.active { color: #e8e8e8; border-bottom: 3px solid #4a4aaf;
+                                background: rgba(74,74,175,0.15); }
+.tab-bar.level-2 .tab:hover:not(.active):not(.disabled) { color: #ccc; }
+/* Level-3 tab bar (experiment name — light) */
+.tab-bar.level-3 { background: #f0f0f5; border-bottom: 2px solid #dee2e6; }
+.tab-bar.level-3 .tab { padding: 8px 18px; font-size: 13px; font-weight: 500;
+                         color: #636e72; }
+.tab-bar.level-3 .tab.active { color: #2d3436; border-bottom: 3px solid #2d3adf;
+                                background: rgba(45,58,223,0.05); font-weight: 600; }
+.tab-bar.level-3 .tab:hover:not(.active) { color: #2d3436; background: #e8e8f0; }
+/* Nested content pane visibility */
+.l1-content { display: none; }
+.l1-content.active { display: block; }
+.l2-content { display: none; }
+.l2-content.active { display: block; }
+.l3-content { display: none; }
+.l3-content.active { display: block; }
 .cards { display: flex; gap: 20px; padding: 24px 40px; flex-wrap: wrap; }
 .card { background: #fff; border: 1px solid #dee2e6; border-radius: 10px;
         padding: 20px 28px; min-width: 180px; flex: 1; }
@@ -397,6 +437,7 @@ footer { text-align: center; padding: 20px; font-size: 12px; color: #b2bec3; }
 """
 
 _JS = """\
+/* --- Single-result (generate_html) backward-compat --- */
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(function(c) {
         c.classList.remove('active');
@@ -411,8 +452,56 @@ function showTab(tabId) {
     showView(tabId, 'pivot');
 }
 
+/* --- Multi-level tab switching (generate_html_multi) --- */
+function showL1Tab(tabId) {
+    document.querySelectorAll('.l1-content').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-bar.level-1 .tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    var el = document.getElementById('l1-' + tabId);
+    if (el) el.classList.add('active');
+    var btn = document.querySelector('.tab-bar.level-1 .tab[data-tab="' + tabId + '"]');
+    if (btn) btn.classList.add('active');
+}
+
+function showL2Tab(model, typeId) {
+    var container = document.getElementById('l1-' + model);
+    if (!container) return;
+    container.querySelectorAll('.l2-content').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    container.querySelectorAll('.tab-bar.level-2 .tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    var l2Id = model + '--' + typeId;
+    var el = document.getElementById('l2-' + l2Id);
+    if (el) el.classList.add('active');
+    var btn = container.querySelector('.tab-bar.level-2 .tab[data-tab="' + l2Id + '"]');
+    if (btn) btn.classList.add('active');
+}
+
+function showL3Tab(model, typeId, expId) {
+    var l2Id = model + '--' + typeId;
+    var container = document.getElementById('l2-' + l2Id);
+    if (!container) return;
+    container.querySelectorAll('.l3-content').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    container.querySelectorAll('.tab-bar.level-3 .tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    var l3Id = model + '--' + typeId + '--' + expId;
+    var el = document.getElementById('l3-' + l3Id);
+    if (el) el.classList.add('active');
+    var btn = container.querySelector('.tab-bar.level-3 .tab[data-tab="' + l3Id + '"]');
+    if (btn) btn.classList.add('active');
+    showView(l3Id, 'pivot');
+}
+
 function showView(tabId, v) {
-    var tab = document.getElementById('tab-' + tabId);
+    var tab = document.getElementById('tab-' + tabId) || document.getElementById('l3-' + tabId);
     if (!tab) return;
     var pivotEl = tab.querySelector('.pivot-view');
     var allEl = tab.querySelector('.all-view');
@@ -1274,12 +1363,21 @@ def generate_html(metrics, results_root, data_root=None):
 </html>"""
 
 
+def _esc(name):
+    """Escape a name for safe use in HTML attributes and JS strings."""
+    return name.replace("&", "&amp;").replace('"', "&quot;").replace("'", "\\'")
+
+
 def generate_html_multi(result_sets, data_root=None):
-    """Generate multi-tab HTML dashboard from multiple result sets.
+    """Generate multi-tab HTML dashboard with 3-level nested tabs.
 
     Args:
-        result_sets: list of (name, path) tuples from discover_result_sets.
-        data_root: path to the data/ directory. Auto-detected from repo root if None.
+        result_sets: nested dict from :func:`discover_result_sets`::
+
+            {model: {exp_type: [(exp_name, path), ...]}}
+
+        data_root: path to the data/ directory. Auto-detected from repo root
+            if *None*.
     """
     if data_root is None:
         data_root = str(_find_repo_root() / "data")
@@ -1288,36 +1386,89 @@ def generate_html_multi(result_sets, data_root=None):
 
     # Data Analysis tab is always first and active
     data_stats = collect_data_stats(data_root)
-    tab_buttons = [
+    l1_buttons = [
         '<button class="tab active" data-tab="data-analysis" '
-        "onclick=\"showTab('data-analysis')\">Data Analysis</button>"
+        "onclick=\"showL1Tab('data-analysis')\">Data Analysis</button>"
     ]
-    tab_divs = [
-        f'<div id="tab-data-analysis" class="tab-content active">\n'
+    l1_divs = [
+        f'<div id="l1-data-analysis" class="l1-content active">\n'
         f'{_render_data_tab(data_stats)}\n</div>'
     ]
 
-    # Result set tabs (none active — data tab takes that role)
-    for name, path in result_sets:
-        esc_name = name.replace('"', '&quot;')
-        tab_buttons.append(
-            f'<button class="tab" data-tab="{esc_name}" '
-            f"onclick=\"showTab('{esc_name}')\">{name}</button>"
+    total_metrics = 0
+
+    for model, types in result_sets.items():
+        esc_model = _esc(model)
+        l1_buttons.append(
+            f'<button class="tab" data-tab="{esc_model}" '
+            f"onclick=\"showL1Tab('{esc_model}')\">{model}</button>"
         )
 
-        metrics = collect_all_metrics(path)
-        content = _render_tab_content(metrics, path, name)
-        tab_divs.append(
-            f'<div id="tab-{esc_name}" class="tab-content">\n{content}\n</div>'
+        # --- Level 2 tab bar (inside this model) ---
+        l2_buttons = []
+        l2_divs = []
+        first_type = True
+        for exp_type, experiments in types.items():
+            esc_type = _esc(exp_type)
+            l2_id = f"{esc_model}--{esc_type}"
+            active_cls = " active" if first_type and experiments else ""
+            disabled = " disabled" if not experiments else ""
+
+            l2_buttons.append(
+                f'<button class="tab{active_cls}{disabled}" data-tab="{l2_id}" '
+                f"onclick=\"showL2Tab('{esc_model}','{esc_type}')\">"
+                f'{exp_type}{"" if experiments else " (empty)"}</button>'
+            )
+
+            if not experiments:
+                l2_divs.append(
+                    f'<div id="l2-{l2_id}" class="l2-content">'
+                    '<div class="content"><p style="padding:40px;color:#636e72;">'
+                    'No experiments yet.</p></div></div>'
+                )
+                continue
+
+            # --- Level 3 tab bar (inside this type) ---
+            l3_buttons = []
+            l3_divs = []
+            first_exp = True
+            for exp_name, exp_path in experiments:
+                esc_exp = _esc(exp_name)
+                l3_id = f"{esc_model}--{esc_type}--{esc_exp}"
+                l3_active = " active" if first_exp else ""
+
+                l3_buttons.append(
+                    f'<button class="tab{l3_active}" data-tab="{l3_id}" '
+                    f"onclick=\"showL3Tab('{esc_model}','{esc_type}','{esc_exp}')\">"
+                    f'{exp_name}</button>'
+                )
+
+                metrics = collect_all_metrics(exp_path)
+                total_metrics += len(metrics)
+                content = _render_tab_content(metrics, exp_path, l3_id)
+                l3_divs.append(
+                    f'<div id="l3-{l3_id}" class="l3-content{l3_active}">\n'
+                    f'{content}\n</div>'
+                )
+                first_exp = False
+
+            l3_bar = f'<nav class="tab-bar level-3">{"".join(l3_buttons)}</nav>'
+            l2_divs.append(
+                f'<div id="l2-{l2_id}" class="l2-content{active_cls}">\n'
+                f'{l3_bar}\n{"".join(l3_divs)}\n</div>'
+            )
+            if first_type and experiments:
+                first_type = False
+
+        l2_bar = f'<nav class="tab-bar level-2">{"".join(l2_buttons)}</nav>'
+        l1_divs.append(
+            f'<div id="l1-{esc_model}" class="l1-content">\n'
+            f'{l2_bar}\n{"".join(l2_divs)}\n</div>'
         )
 
-    tab_bar_html = f'<nav class="tab-bar">{"".join(tab_buttons)}</nav>'
+    l1_bar = f'<nav class="tab-bar level-1">{"".join(l1_buttons)}</nav>'
 
-    # Compute a global summary for the header subtitle
-    total_metrics = sum(
-        len(collect_all_metrics(path)) for _, path in result_sets
-    )
-
+    n_models = len(result_sets)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1331,12 +1482,12 @@ def generate_html_multi(result_sets, data_root=None):
 <header>
 <h1>LG-CoTrain &mdash; Results Dashboard</h1>
 <p>Semi-supervised co-training &middot; BERT &middot; HumAID dataset &middot;
-{len(result_sets)} result sets &middot; {total_metrics} total experiments</p>
+{n_models} model(s) &middot; {total_metrics} total experiments</p>
 </header>
 
-{tab_bar_html}
+{l1_bar}
 
-{"".join(tab_divs)}
+{"".join(l1_divs)}
 
 <footer>Generated at {timestamp}</footer>
 
@@ -1379,20 +1530,26 @@ def main():
     output = args.output or str(Path(args.results_root) / "dashboard.html")
     result_sets = discover_result_sets(args.results_root)
 
-    if len(result_sets) == 1:
-        # Single result set: two-tab page (Data Analysis + Results)
-        name, path = result_sets[0]
-        metrics = collect_all_metrics(path)
-        html = generate_html(metrics, path, data_root=args.data_root)
+    if not result_sets:
+        # No nested hierarchy — treat root as a single flat result set
+        metrics = collect_all_metrics(args.results_root)
+        html = generate_html(metrics, args.results_root, data_root=args.data_root)
         total = len(metrics)
+        n_models = 0
     else:
-        # Multiple result sets: Data Analysis tab + one tab per result set
+        # Hierarchical result sets: 3-level nested tabs
         html = generate_html_multi(result_sets, data_root=args.data_root)
-        total = sum(len(collect_all_metrics(p)) for _, p in result_sets)
+        total = sum(
+            len(collect_all_metrics(path))
+            for model_types in result_sets.values()
+            for experiments in model_types.values()
+            for _, path in experiments
+        )
+        n_models = len(result_sets)
 
     Path(output).write_text(html)
     print(f"Dashboard written to {output}")
-    print(f"  {len(result_sets)} result set(s), {total} total experiments")
+    print(f"  {n_models} model(s), {total} total experiments")
 
 
 if __name__ == "__main__":
