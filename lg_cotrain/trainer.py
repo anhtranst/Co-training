@@ -8,9 +8,9 @@ from typing import Dict
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.utils.data import DataLoader
-from transformers import BertTokenizer
+from transformers import BertTokenizer, get_linear_schedule_with_warmup
 
 from .config import LGCoTrainConfig
 from .data_loading import (
@@ -153,8 +153,8 @@ class LGCoTrainer:
         logger.info("=== Phase 1: Weight Generation ===")
         model1 = create_fresh_model(cfg).to(self.device)
         model2 = create_fresh_model(cfg).to(self.device)
-        opt1 = Adam(model1.parameters(), lr=cfg.lr)
-        opt2 = Adam(model2.parameters(), lr=cfg.lr)
+        opt1 = AdamW(model1.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+        opt2 = AdamW(model2.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
         tracker1 = WeightTracker(num_dlg)
         tracker2 = WeightTracker(num_dlg)
@@ -211,8 +211,24 @@ class LGCoTrainer:
         logger.info("=== Phase 2: Co-Training ===")
         model1 = create_fresh_model(cfg).to(self.device)
         model2 = create_fresh_model(cfg).to(self.device)
-        opt1 = Adam(model1.parameters(), lr=cfg.lr)
-        opt2 = Adam(model2.parameters(), lr=cfg.lr)
+        opt1 = AdamW(model1.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+        opt2 = AdamW(model2.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+        # Linear LR scheduler with warmup spanning Phase 2 + Phase 3.
+        num_batches_dlg = len(loader_dlg_train)
+        num_batches_l1 = len(loader_l1)
+        num_batches_l2 = len(loader_l2)
+        total_steps_1 = num_batches_dlg * cfg.cotrain_epochs + num_batches_l1 * cfg.finetune_max_epochs
+        total_steps_2 = num_batches_dlg * cfg.cotrain_epochs + num_batches_l2 * cfg.finetune_max_epochs
+        warmup_steps_1 = int(total_steps_1 * cfg.warmup_ratio)
+        warmup_steps_2 = int(total_steps_2 * cfg.warmup_ratio)
+        scheduler1 = get_linear_schedule_with_warmup(opt1, warmup_steps_1, total_steps_1)
+        scheduler2 = get_linear_schedule_with_warmup(opt2, warmup_steps_2, total_steps_2)
+
+        logger.info(
+            f"LR scheduler: total_steps_1={total_steps_1}, warmup={warmup_steps_1}; "
+            f"total_steps_2={total_steps_2}, warmup={warmup_steps_2}"
+        )
 
         # Per Algorithm 1: seed Phase 2 trackers with only the final Phase 1 epoch.
         # The paper uses the last Phase 1 epoch as the initial seeding point so that
@@ -249,6 +265,7 @@ class LGCoTrainer:
                 opt1.zero_grad()
                 loss1.backward()
                 opt1.step()
+                scheduler1.step()
 
                 # Model 2 loss (uses theta1's weights = lambda1)
                 logits2 = model2(input_ids, attention_mask)
@@ -258,6 +275,7 @@ class LGCoTrainer:
                 opt2.zero_grad()
                 loss2.backward()
                 opt2.step()
+                scheduler2.step()
 
                 epoch_loss1 += loss1.item()
                 epoch_loss2 += loss2.item()
@@ -351,6 +369,7 @@ class LGCoTrainer:
                 loss = F.cross_entropy(logits, batch["labels"].to(self.device))
                 loss.backward()
                 opt1.step()
+                scheduler1.step()
 
             # Fine-tune model2 on D_l2
             model2.train()
@@ -363,6 +382,7 @@ class LGCoTrainer:
                 loss = F.cross_entropy(logits, batch["labels"].to(self.device))
                 loss.backward()
                 opt2.step()
+                scheduler2.step()
 
             # Evaluate ensemble on dev — always on full dev set for logging
             dev_preds, dev_labels, _ = ensemble_predict(model1, model2, loader_dev, self.device)

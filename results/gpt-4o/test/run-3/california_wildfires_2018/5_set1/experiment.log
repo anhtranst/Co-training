@@ -1,0 +1,8 @@
+2026-02-20 23:27:24,386 - lg_cotrain - INFO - Starting LG-CoTrain: event=california_wildfires_2018, budget=5, seed_set=1
+2026-02-20 23:27:24,424 - lg_cotrain - INFO - Detected 10 classes for event california_wildfires_2018: ['caution_and_advice', 'displaced_people_and_evacuations', 'infrastructure_and_utility_damage', 'injured_or_dead_people', 'missing_or_found_people', 'not_humanitarian', 'other_relevant_information', 'requests_or_urgent_needs', 'rescue_volunteering_or_donation_effort', 'sympathy_and_support']
+2026-02-20 23:27:24,437 - lg_cotrain - INFO - D_l1: 30, D_l2: 20, D_LG: 5113
+2026-02-20 23:27:24,440 - lg_cotrain - INFO - === Phase 1: Weight Generation ===
+2026-02-20 23:27:43,160 - lg_cotrain - INFO - Phase 1 epoch 1/7: mean_prob1=0.0981, mean_prob2=0.1025
+2026-02-20 23:28:00,550 - lg_cotrain - INFO - Phase 1 epoch 2/7: mean_prob1=0.0997, mean_prob2=0.0991
+2026-02-20 23:28:18,604 - lg_cotrain - INFO - Phase 1 epoch 3/7: mean_prob1=0.1010, mean_prob2=0.0970
+2026-02-20 23:28:37,578 - lg_cotrain - INFO - Phase 1 epoch 4/7: mean_prob1=0.1015, mean_prob2=0.0978

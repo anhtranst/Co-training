@@ -72,6 +72,8 @@ def main():
     )
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-5)
+    parser.add_argument("--weight-decay", type=float, default=0.01)
+    parser.add_argument("--warmup-ratio", type=float, default=0.1)
     parser.add_argument("--max-seq-length", type=int, default=128)
 
     # Paths
@@ -96,6 +98,8 @@ def main():
         stopping_strategy=args.stopping_strategy,
         batch_size=args.batch_size,
         lr=args.lr,
+        weight_decay=args.weight_decay,
+        warmup_ratio=args.warmup_ratio,
         max_seq_length=args.max_seq_length,
     )
 

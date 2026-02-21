@@ -35,6 +35,8 @@ class LGCoTrainConfig:
     # Optimization
     batch_size: int = 32
     lr: float = 2e-5
+    weight_decay: float = 0.01
+    warmup_ratio: float = 0.1
 
     # Paths (base) — default to sibling directories of this package, which
     # resolves correctly on any OS regardless of where the repo is cloned.

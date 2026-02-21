@@ -416,6 +416,8 @@ python -m lg_cotrain.run_experiment \
 | `--stopping-strategy`  | Phase 3 early stopping strategy (`baseline`, `no_early_stopping`, `per_class_patience`, `weighted_macro_f1`, `balanced_dev`, `scaled_threshold`) | `baseline` |
 | `--batch-size`          | Training batch size                 | `32`                            |
 | `--lr`                  | Learning rate                       | `2e-5`                          |
+| `--weight-decay`        | AdamW weight decay                  | `0.01`                          |
+| `--warmup-ratio`        | LR scheduler warmup ratio           | `0.1`                           |
 | `--max-seq-length`      | Max token sequence length           | `128`                           |
 | `--data-root`           | Path to data directory              | `data/`                         |
 | `--results-root`        | Path to results directory           | `results/`                      |
@@ -432,6 +434,7 @@ Six Jupyter notebooks are provided in the `Notebooks/` directory:
 | `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{source}/test/{run_name}/` to enable side-by-side comparison across runs. |
 | `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/{source}/quick-stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 | `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/{source}/stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
+| `06_all_disasters_adamw_run.ipynb` | **Full 120-experiment run with AdamW** optimizer, linear LR scheduler, and 10% warmup (run-3). Uses baseline stopping strategy and paper-default hyperparameters. Results stored in `results/gpt-4o/test/run-3/`. |
 
 All notebooks support **resume** — if interrupted, they skip experiments that already have `metrics.json` files.
 

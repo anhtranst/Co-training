@@ -28,6 +28,22 @@ class TestConfigDefaults(unittest.TestCase):
         cfg = LGCoTrainConfig()
         self.assertEqual(cfg.lr, 2e-5)
 
+    def test_default_weight_decay(self):
+        cfg = LGCoTrainConfig()
+        self.assertEqual(cfg.weight_decay, 0.01)
+
+    def test_default_warmup_ratio(self):
+        cfg = LGCoTrainConfig()
+        self.assertEqual(cfg.warmup_ratio, 0.1)
+
+    def test_custom_weight_decay(self):
+        cfg = LGCoTrainConfig(weight_decay=0.05)
+        self.assertEqual(cfg.weight_decay, 0.05)
+
+    def test_custom_warmup_ratio(self):
+        cfg = LGCoTrainConfig(warmup_ratio=0.2)
+        self.assertEqual(cfg.warmup_ratio, 0.2)
+
     def test_default_max_seq_length(self):
         cfg = LGCoTrainConfig()
         self.assertEqual(cfg.max_seq_length, 128)
