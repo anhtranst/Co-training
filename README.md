@@ -319,7 +319,7 @@ data/
 pip install -r lg_cotrain/requirements.txt
 ```
 
-**Dependencies**: `torch`, `transformers`, `pandas`, `scikit-learn`, `numpy`, `pytest`
+**Dependencies**: `torch`, `transformers`, `pandas`, `scikit-learn`, `numpy`, `optuna`, `pytest`
 
 ---
 
@@ -373,6 +373,29 @@ python -m lg_cotrain.run_experiment \
 
 This reads pseudo-labels from `data/pseudo-labelled/llama-3/` and writes results to `results/llama-3-run1/`.
 
+### Hyperparameter Tuning with Optuna
+
+Find optimal hyperparameters using a global Optuna study. Each trial runs the full 3-phase pipeline across all 10 events (budget=50, seed=1 by default), optimizing mean dev macro-F1:
+
+```bash
+# Run 20 trials across all 10 events
+python -m lg_cotrain.optuna_tuner --n-trials 20
+
+# Tune on a subset of events
+python -m lg_cotrain.optuna_tuner --n-trials 10 --events hurricane_harvey_2017 kerala_floods_2018
+
+# Use SQLite storage for resumable studies
+python -m lg_cotrain.optuna_tuner --n-trials 20 --storage sqlite:///optuna.db
+```
+
+The tuner searches over: `lr` (1e-5 to 1e-3), `batch_size` ([8, 16, 32, 64]), `cotrain_epochs` (5-20), and `finetune_patience` (4-10). After the study completes, apply the best parameters to your experiments:
+
+```bash
+python -m lg_cotrain.run_experiment \
+    --events california_wildfires_2018 canada_wildfires_2016 \
+    --lr 3.5e-4 --batch-size 16 --cotrain-epochs 12 --finetune-patience 7
+```
+
 ### All CLI Options
 
 | Option                  | Description                         | Default                         |
@@ -399,10 +422,11 @@ This reads pseudo-labels from `data/pseudo-labelled/llama-3/` and writes results
 
 ### Interactive Notebooks
 
-Three Jupyter notebooks are provided in the `Notebooks/` directory:
+Six Jupyter notebooks are provided in the `Notebooks/` directory:
 
 | Notebook                            | Description                                                                                                                                                                                                                                                       |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `00_optuna_hyperparameter_tuning.ipynb` | **Global Optuna hyperparameter tuning**. Runs a Bayesian search over lr, batch_size, cotrain_epochs, and finetune_patience across all 10 events (budget=50, seed=1). Optimizes mean dev macro-F1. Includes optimization history plots, parameter distributions, and CLI commands to apply the best params. |
 | `01_kaikoura_experiment.ipynb`      | Step-by-step walkthrough of the full pipeline on one event (Kaikoura Earthquake). Includes class distributions, per-epoch probability tracking, training curves, and per-class F1 charts.                                                                         |
 | `02_all_disasters_experiment.ipynb` | Runs all 120 experiments (10 events x 4 budgets x 3 seeds) with resume support. Contains cross-disaster summary tables, line plots, and heatmaps.                                                                                                                 |
 | `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{source}/test/{run_name}/` to enable side-by-side comparison across runs. |
@@ -520,18 +544,20 @@ lg_cotrain/                          # Main package
 ├── run_experiment.py                # CLI entry point (single + batch mode)
 ├── run_all.py                       # Batch runner: all budget x seed_set experiments for one event
 ├── dashboard.py                     # HTML dashboard generator (3-level nested tabs, auto-discovery)
+├── optuna_tuner.py                  # Global Optuna hyperparameter tuner (standalone, uses dev macro-F1)
 ├── utils.py                         # Seed setting, logging, EarlyStopping + alternative stopping classes, device selection
 ├── weight_tracker.py                # Per-sample probability tracking and lambda weight computation
 └── requirements.txt                 # Python dependencies
 
 Notebooks/
+├── 00_optuna_hyperparameter_tuning.ipynb       # Global Optuna hyperparameter tuning (mean dev F1 across events)
 ├── 01_kaikoura_experiment.ipynb                 # Step-by-step pipeline walkthrough with visualizations
 ├── 02_all_disasters_experiment.ipynb            # Full 120-experiment run (preserved results)
 ├── 03_all_disasters_rerun.ipynb                 # Re-run with configurable pseudo-label source + output folder
 ├── 04_alternative_stopping_strategies.ipynb     # Quick comparison of stopping strategies (budget=50, seed=1)
 └── 05_stopping_strategies_full_run.ipynb        # Full sweep across all strategies (720 runs)
 
-tests/                               # 359 tests across 13 test files
+tests/                               # 380+ tests across 14 test files
 ├── conftest.py                      # Shared pytest fixtures
 ├── test_config.py                   # Config dataclass path computation and defaults (25 tests)
 ├── test_dashboard.py                # Dashboard HTML generation, auto-discovery, multi-tab (62 tests)
@@ -543,6 +569,7 @@ tests/                               # 359 tests across 13 test files
 ├── test_notebook_02.py              # Notebook 02 structure validation (22 tests)
 ├── test_run_all.py                  # Batch runner, custom budgets/seeds/source (25 tests)
 ├── test_run_experiment.py           # CLI argument parsing and forwarding (12 tests)
+├── test_optuna_tuner.py             # Global Optuna tuner, pruning, CLI parsing (20 tests)
 ├── test_trainer.py                  # Full pipeline integration test (4 tests)
 ├── test_utils.py                    # Seed, EarlyStopping, device (13 tests)
 └── test_weight_tracker.py           # Lambda weight computation, seeding (31 tests)
@@ -566,6 +593,7 @@ results/                             # Experiment outputs + dashboard
 ### Module Dependency Graph
 
 ```
+    optuna_tuner.py ──► trainer.py (via _trainer_cls injection)
     run_experiment.py ──► run_all.py ──► trainer.py
                               │              │
                               │         ┌────┴─────────────────┐
@@ -622,6 +650,7 @@ python -m unittest tests/test_evaluate.py
 | `test_model.py`             | 4     | BertClassifier forward pass, predict_proba                            |
 | `test_notebook.py`          | 56    | Notebook 01 + 03 structure, imports, content, cell types              |
 | `test_notebook_02.py`       | 22    | Notebook 02 structure and content                                     |
+| `test_optuna_tuner.py`      | 20    | Global Optuna study, objective function, pruning, CLI args            |
 | `test_run_all.py`           | 25    | Batch runner, custom budgets/seeds, pseudo-label forwarding           |
 | `test_run_experiment.py`    | 12    | CLI parsing, single/batch modes, argument forwarding                  |
 | `test_trainer.py`           | 4     | Full 3-phase pipeline integration                                     |
@@ -647,6 +676,8 @@ python -m unittest tests/test_evaluate.py
 - **Configurable pseudo-label source**: The `pseudo_label_source` field in `LGCoTrainConfig` (default `"gpt-4o"`) determines which directory under `data/pseudo-labelled/` to read from, enabling experiments with different LLMs without code changes.
 
 - **3-level results hierarchy**: Results are organized in a 3-level folder structure (`results/{model}/{type}/{experiment}/`) instead of flat names. For example, `results/gpt-4o/quick-stop/baseline/` instead of `results/gpt-4o-quick-stop-baseline/`. The dashboard uses nested tab bars (model → type → experiment) to navigate without horizontal overflow.
+
+- **Standalone Optuna tuner**: `optuna_tuner.py` is a self-contained script that uses the existing pipeline without modifications. It runs a global Optuna study (mean dev macro-F1 across all events) and prints the best hyperparameters. The user then applies them via CLI flags. This avoids test-set leakage (unlike Bharanibala's implementation which evaluates on the test set).
 
 - **Resume support**: Both `run_all_experiments()` and the notebooks skip experiments whose `metrics.json` already exists, making it safe to restart after crashes.
 
