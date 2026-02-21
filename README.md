@@ -375,6 +375,8 @@ This reads pseudo-labels from `data/pseudo-labelled/llama-3/` and writes results
 
 ### Hyperparameter Tuning with Optuna
 
+#### Global tuning (one set of hyperparameters for all experiments)
+
 Find optimal hyperparameters using a global Optuna study. Each trial runs the full 3-phase pipeline across all 10 events (budget=50, seed=1 by default), optimizing mean dev macro-F1:
 
 ```bash
@@ -395,6 +397,23 @@ python -m lg_cotrain.run_experiment \
     --events california_wildfires_2018 canada_wildfires_2016 \
     --lr 3.5e-4 --batch-size 16 --cotrain-epochs 12 --finetune-patience 7
 ```
+
+#### Per-experiment tuning (120 separate studies)
+
+Find experiment-specific optimal hyperparameters — one Optuna study per (event, budget, seed_set) combination. Each study optimizes `dev_macro_f1` over 6 hyperparameters (lr, batch_size, cotrain_epochs, finetune_patience, weight_decay, warmup_ratio). Studies run in parallel across GPUs:
+
+```bash
+# Run all 120 studies with 15 trials each on 2 GPUs
+python -m lg_cotrain.optuna_per_experiment --n-trials 15 --num-gpus 2
+
+# Tune a subset
+python -m lg_cotrain.optuna_per_experiment --n-trials 10 \
+    --events hurricane_harvey_2017 --budgets 50 --seed-sets 1
+
+# Resume is automatic — existing best_params.json files are skipped
+```
+
+Results are saved as `best_params.json` in `results/optuna/per_experiment/{event}/{budget}_set{seed}/`. Use `load_best_params()` to load all results for final experiments.
 
 ### All CLI Options
 
@@ -419,12 +438,13 @@ python -m lg_cotrain.run_experiment \
 | `--weight-decay`        | AdamW weight decay                  | `0.01`                          |
 | `--warmup-ratio`        | LR scheduler warmup ratio           | `0.1`                           |
 | `--max-seq-length`      | Max token sequence length           | `128`                           |
+| `--num-gpus`            | Number of GPUs for parallel execution | `1` (sequential)              |
 | `--data-root`           | Path to data directory              | `data/`                         |
 | `--results-root`        | Path to results directory           | `results/`                      |
 
 ### Interactive Notebooks
 
-Six Jupyter notebooks are provided in the `Notebooks/` directory:
+Eight Jupyter notebooks are provided in the `Notebooks/` directory:
 
 | Notebook                            | Description                                                                                                                                                                                                                                                       |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -434,7 +454,8 @@ Six Jupyter notebooks are provided in the `Notebooks/` directory:
 | `03_all_disasters_rerun.ipynb`      | Re-run all disasters with a **configurable pseudo-label source** and **named output folder**. Edit `PSEUDO_LABEL_SOURCE` and `RUN_NAME` in cell 2, then run all cells. Results are stored in `results/{source}/test/{run_name}/` to enable side-by-side comparison across runs. |
 | `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/{source}/quick-stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 | `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/{source}/stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
-| `06_all_disasters_adamw_run.ipynb` | **Full 120-experiment run with AdamW** optimizer, linear LR scheduler, and 10% warmup (run-3). Uses baseline stopping strategy and paper-default hyperparameters. Results stored in `results/gpt-4o/test/run-3/`. |
+| `06_all_disasters_adamw_run.ipynb` | **Full 120-experiment run with AdamW** optimizer, linear LR scheduler, and 10% warmup (run-3). Uses baseline stopping strategy, paper-default hyperparameters, and **multi-GPU parallel execution** (`NUM_GPUS=2`). Results stored in `results/gpt-4o/test/run-3/`. |
+| `07_optuna_per_experiment.ipynb` | **Per-experiment Optuna tuning**: 120 separate studies (one per event/budget/seed), each optimizing 6 hyperparameters (lr, batch_size, cotrain_epochs, finetune_patience, weight_decay, warmup_ratio) over N trials. Multi-GPU parallel execution. Results saved as `best_params.json` in `results/optuna/per_experiment/`. |
 
 All notebooks support **resume** — if interrupted, they skip experiments that already have `metrics.json` files.
 
@@ -547,8 +568,10 @@ lg_cotrain/                          # Main package
 ├── trainer.py                       # LGCoTrainer — orchestrates the 3-phase pipeline
 ├── run_experiment.py                # CLI entry point (single + batch mode)
 ├── run_all.py                       # Batch runner: all budget x seed_set experiments for one event
+├── parallel.py                      # Multi-GPU parallel execution (ProcessPoolExecutor with spawn)
 ├── dashboard.py                     # HTML dashboard generator (3-level nested tabs, auto-discovery)
 ├── optuna_tuner.py                  # Global Optuna hyperparameter tuner (standalone, uses dev macro-F1)
+├── optuna_per_experiment.py         # Per-experiment Optuna tuner (120 studies, multi-GPU, JSON results)
 ├── utils.py                         # Seed setting, logging, EarlyStopping + alternative stopping classes, device selection
 ├── weight_tracker.py                # Per-sample probability tracking and lambda weight computation
 └── requirements.txt                 # Python dependencies
@@ -559,11 +582,13 @@ Notebooks/
 ├── 02_all_disasters_experiment.ipynb            # Full 120-experiment run (preserved results)
 ├── 03_all_disasters_rerun.ipynb                 # Re-run with configurable pseudo-label source + output folder
 ├── 04_alternative_stopping_strategies.ipynb     # Quick comparison of stopping strategies (budget=50, seed=1)
-└── 05_stopping_strategies_full_run.ipynb        # Full sweep across all strategies (720 runs)
+├── 05_stopping_strategies_full_run.ipynb        # Full sweep across all strategies (720 runs)
+├── 06_all_disasters_adamw_run.ipynb             # AdamW + linear scheduler run-3 (multi-GPU parallel)
+└── 07_optuna_per_experiment.ipynb               # Per-experiment Optuna tuning (120 studies, multi-GPU)
 
-tests/                               # 380+ tests across 14 test files
+tests/                               # 400+ tests across 16 test files
 ├── conftest.py                      # Shared pytest fixtures
-├── test_config.py                   # Config dataclass path computation and defaults (25 tests)
+├── test_config.py                   # Config dataclass path computation and defaults (28 tests)
 ├── test_dashboard.py                # Dashboard HTML generation, auto-discovery, multi-tab, Optuna tab (105 tests)
 ├── test_data_loading.py             # Data loading, label encoding, class detection (28 tests)
 ├── test_early_stopping.py           # PerClassEarlyStopping, EarlyStoppingWithDelta, class weight helpers (26 tests)
@@ -571,6 +596,8 @@ tests/                               # 380+ tests across 14 test files
 ├── test_model.py                    # BertClassifier forward/predict_proba (4 tests)
 ├── test_notebook.py                 # Notebook 01 + 03 structure and content validation (56 tests)
 ├── test_notebook_02.py              # Notebook 02 structure validation (22 tests)
+├── test_optuna_per_experiment.py     # Per-experiment Optuna tuner, resume, GPU assignment, load_best_params (16 tests)
+├── test_parallel.py                 # Multi-GPU parallel dispatch, resume, round-robin, callbacks (11 tests)
 ├── test_run_all.py                  # Batch runner, custom budgets/seeds/source (25 tests)
 ├── test_run_experiment.py           # CLI argument parsing and forwarding (12 tests)
 ├── test_optuna_tuner.py             # Global Optuna tuner, pruning, CLI parsing (20 tests)
@@ -597,7 +624,8 @@ results/                             # Experiment outputs + dashboard
 ### Module Dependency Graph
 
 ```
-    optuna_tuner.py ──► trainer.py (via _trainer_cls injection)
+    optuna_tuner.py ─────────► trainer.py (via _trainer_cls injection)
+    optuna_per_experiment.py ─► trainer.py (via _trainer_cls injection)
     run_experiment.py ──► run_all.py ──► trainer.py
                               │              │
                               │         ┌────┴─────────────────┐
@@ -681,7 +709,7 @@ python -m unittest tests/test_evaluate.py
 
 - **3-level results hierarchy**: Results are organized in a 3-level folder structure (`results/{model}/{type}/{experiment}/`) instead of flat names. For example, `results/gpt-4o/quick-stop/baseline/` instead of `results/gpt-4o-quick-stop-baseline/`. The dashboard uses nested tab bars (model → type → experiment) to navigate without horizontal overflow.
 
-- **Standalone Optuna tuner**: `optuna_tuner.py` is a self-contained script that uses the existing pipeline without modifications. It runs a global Optuna study (mean dev macro-F1 across all events) and prints the best hyperparameters. The user then applies them via CLI flags. This avoids test-set leakage (unlike Bharanibala's implementation which evaluates on the test set).
+- **Optuna tuners**: Two self-contained Optuna tuning modes are available. `optuna_tuner.py` runs a global study (mean dev macro-F1 across all events) to find one set of hyperparameters. `optuna_per_experiment.py` runs 120 separate studies (one per event/budget/seed) to find experiment-specific optimal hyperparameters over 6 dimensions. Both use dev macro-F1 as the objective (no test-set leakage). Per-experiment studies run in parallel across GPUs and save results as JSON files with resume support.
 
 - **Resume support**: Both `run_all_experiments()` and the notebooks skip experiments whose `metrics.json` already exists, making it safe to restart after crashes.
 

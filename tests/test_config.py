@@ -160,6 +160,25 @@ class TestConfigPseudoLabelSource(unittest.TestCase):
         self.assertEqual(cfg1.pseudo_label_path, cfg2.pseudo_label_path)
 
 
+class TestConfigDevice(unittest.TestCase):
+    """Device override field."""
+
+    def test_default_device_is_none(self):
+        cfg = LGCoTrainConfig()
+        self.assertIsNone(cfg.device)
+
+    def test_custom_device(self):
+        cfg = LGCoTrainConfig(device="cuda:1")
+        self.assertEqual(cfg.device, "cuda:1")
+
+    def test_device_does_not_affect_paths(self):
+        cfg1 = LGCoTrainConfig(event="canada_wildfires_2016", budget=5, seed_set=1)
+        cfg2 = LGCoTrainConfig(event="canada_wildfires_2016", budget=5, seed_set=1,
+                                device="cuda:1")
+        self.assertEqual(cfg1.labeled_path, cfg2.labeled_path)
+        self.assertEqual(cfg1.output_dir, cfg2.output_dir)
+
+
 class TestConfigCustomRoots(unittest.TestCase):
     """Custom data_root and results_root."""
 

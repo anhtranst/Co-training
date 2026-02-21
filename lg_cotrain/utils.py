@@ -29,10 +29,12 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-def get_device():
-    """Return CUDA device if available, else CPU."""
+def get_device(device_override=None):
+    """Return the specified device, or CUDA if available, else CPU."""
     if not HAS_TORCH:
         raise RuntimeError("torch is required for get_device()")
+    if device_override is not None:
+        return torch.device(device_override)
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 

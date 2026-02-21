@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass
@@ -37,6 +38,9 @@ class LGCoTrainConfig:
     lr: float = 2e-5
     weight_decay: float = 0.01
     warmup_ratio: float = 0.1
+
+    # Device override: "cuda:0", "cuda:1", "cpu", or None (auto-detect)
+    device: Optional[str] = None
 
     # Paths (base) — default to sibling directories of this package, which
     # resolves correctly on any OS regardless of where the repo is cloned.

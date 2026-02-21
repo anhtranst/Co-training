@@ -44,7 +44,7 @@ class LGCoTrainer:
 
     def __init__(self, config: LGCoTrainConfig):
         self.config = config
-        self.device = get_device()
+        self.device = get_device(config.device)
         self.tokenizer = BertTokenizer.from_pretrained(config.model_name)
 
     def _make_dataset(self, texts, labels) -> TweetDataset:

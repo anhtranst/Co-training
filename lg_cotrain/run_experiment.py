@@ -80,6 +80,12 @@ def main():
     parser.add_argument("--data-root", type=str, default="/workspace/data")
     parser.add_argument("--results-root", type=str, default="/workspace/results")
 
+    # Parallel execution
+    parser.add_argument(
+        "--num-gpus", type=int, default=1,
+        help="Number of GPUs for parallel execution (default: 1 = sequential)",
+    )
+
     args = parser.parse_args()
 
     events = args.events
@@ -110,6 +116,7 @@ def main():
             event,
             budgets=budgets,
             seed_sets=seed_sets,
+            num_gpus=args.num_gpus,
             data_root=args.data_root,
             results_root=results_root,
             **hyperparams,
