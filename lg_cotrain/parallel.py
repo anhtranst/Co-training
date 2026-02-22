@@ -78,46 +78,63 @@ def run_experiments_parallel(
     if num_gpus < 1:
         raise ValueError(f"num_gpus must be >= 1, got {num_gpus}")
 
-    # Assign GPUs round-robin
-    for i, cfg_kwargs in enumerate(experiment_configs):
-        gpu_id = i % num_gpus
-        cfg_kwargs["device"] = f"cuda:{gpu_id}"
-
     ctx = mp.get_context("spawn")
     results_map: dict = {}  # index -> outcome
+    config_queue = list(range(len(experiment_configs)))  # indices
 
     with ProcessPoolExecutor(
         max_workers=num_gpus, mp_context=ctx
     ) as executor:
-        future_to_idx = {}
-        for idx, cfg_kwargs in enumerate(experiment_configs):
-            future = executor.submit(_run_single_experiment, cfg_kwargs)
-            future_to_idx[future] = idx
+        active: dict = {}  # future -> (config_idx, gpu_id)
 
-        for future in as_completed(future_to_idx):
-            idx = future_to_idx[future]
-            try:
-                outcome = future.result()
-            except Exception as e:
-                cfg = experiment_configs[idx]
-                outcome = {
-                    "event": cfg.get("event", "?"),
-                    "budget": cfg.get("budget", "?"),
-                    "seed_set": cfg.get("seed_set", "?"),
-                    "status": "failed",
-                    "result": None,
-                }
-                logger.error(f"Process-level failure for experiment {idx}: {e}")
+        # Seed the pool: one task per GPU
+        for gpu_id in range(min(num_gpus, len(config_queue))):
+            idx = config_queue.pop(0)
+            experiment_configs[idx]["device"] = f"cuda:{gpu_id}"
+            future = executor.submit(
+                _run_single_experiment, experiment_configs[idx]
+            )
+            active[future] = (idx, gpu_id)
 
-            results_map[idx] = outcome
+        while active:
+            for future in as_completed(active):
+                idx, gpu_id = active.pop(future)
 
-            if on_experiment_done is not None:
-                on_experiment_done(
-                    outcome["event"],
-                    outcome["budget"],
-                    outcome["seed_set"],
-                    outcome["status"],
-                )
+                try:
+                    outcome = future.result()
+                except Exception as e:
+                    cfg = experiment_configs[idx]
+                    outcome = {
+                        "event": cfg.get("event", "?"),
+                        "budget": cfg.get("budget", "?"),
+                        "seed_set": cfg.get("seed_set", "?"),
+                        "status": "failed",
+                        "result": None,
+                    }
+                    logger.error(
+                        f"Process-level failure for experiment {idx}: {e}"
+                    )
+
+                results_map[idx] = outcome
+
+                if on_experiment_done is not None:
+                    on_experiment_done(
+                        outcome["event"],
+                        outcome["budget"],
+                        outcome["seed_set"],
+                        outcome["status"],
+                    )
+
+                # Submit next experiment to the same GPU
+                if config_queue:
+                    next_idx = config_queue.pop(0)
+                    experiment_configs[next_idx]["device"] = f"cuda:{gpu_id}"
+                    new_future = executor.submit(
+                        _run_single_experiment, experiment_configs[next_idx]
+                    )
+                    active[new_future] = (next_idx, gpu_id)
+
+                break  # process one at a time to reassign GPU immediately
 
     # Return results in original order
     return [results_map[i] for i in range(len(experiment_configs))]

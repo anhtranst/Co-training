@@ -401,3 +401,20 @@
 2026-02-21 23:18:19,505 - lg_cotrain - INFO - LR scheduler: total_steps_1=1380, warmup=338; total_steps_2=1380, warmup=338
 2026-02-21 23:19:24,101 - lg_cotrain - INFO - Phase 2 epoch 1/8: loss1=0.0688, loss2=0.1781, dev_macro_f1=0.3429, dev_err=38.56%
 2026-02-21 23:20:29,371 - lg_cotrain - INFO - Phase 2 epoch 2/8: loss1=0.1899, loss2=0.3209, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:21:41,120 - lg_cotrain - INFO - Phase 2 epoch 3/8: loss1=0.0902, loss2=0.4273, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:22:48,943 - lg_cotrain - INFO - Phase 2 epoch 4/8: loss1=0.0739, loss2=0.4171, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:23:52,451 - lg_cotrain - INFO - Phase 2 epoch 5/8: loss1=0.0701, loss2=0.4121, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:24:56,090 - lg_cotrain - INFO - Phase 2 epoch 6/8: loss1=0.0798, loss2=0.4075, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:26:00,159 - lg_cotrain - INFO - Phase 2 epoch 7/8: loss1=0.0800, loss2=0.3998, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:27:04,603 - lg_cotrain - INFO - Phase 2 epoch 8/8: loss1=0.0817, loss2=0.3933, dev_macro_f1=0.0302, dev_err=82.18%
+2026-02-21 23:27:04,603 - lg_cotrain - INFO - === Phase 3: Fine-Tuning ===
+2026-02-21 23:27:07,102 - lg_cotrain - INFO - Phase 3 epoch 1: dev_macro_f1=0.0302, dev_err=82.18%, es_counter1=0, es_counter2=0
+2026-02-21 23:27:09,522 - lg_cotrain - INFO - Phase 3 epoch 2: dev_macro_f1=0.0302, dev_err=82.18%, es_counter1=1, es_counter2=1
+2026-02-21 23:27:11,984 - lg_cotrain - INFO - Phase 3 epoch 3: dev_macro_f1=0.0302, dev_err=82.18%, es_counter1=2, es_counter2=2
+2026-02-21 23:27:14,403 - lg_cotrain - INFO - Phase 3 epoch 4: dev_macro_f1=0.0302, dev_err=82.18%, es_counter1=3, es_counter2=3
+2026-02-21 23:27:16,843 - lg_cotrain - INFO - Phase 3 epoch 5: dev_macro_f1=0.0302, dev_err=82.18%, es_counter1=4, es_counter2=4
+2026-02-21 23:27:16,844 - lg_cotrain - INFO - Early stopping at epoch 5
+2026-02-21 23:27:16,855 - lg_cotrain - INFO - === Final Evaluation ===
+2026-02-21 23:27:23,308 - lg_cotrain - INFO - Results saved to C:\Users\anhtr\AppData\Local\Temp\tmplvhqzlj0\california_wildfires_2018\5_set2\metrics.json
+2026-02-21 23:27:23,308 - lg_cotrain - INFO - Test error rate: 82.14%, Test macro-F1: 0.0303, Test ECE: 0.3908
+2026-02-21 23:27:23,318 - lg_cotrain - INFO - --- Trial 10/10 done: dev_macro_f1=0.0302 ---

@@ -9,17 +9,23 @@ Usage:
     python check_progress.py --results-dir /path/to/results
     python check_progress.py --watch          # refresh every 30s
     python check_progress.py --watch --interval 10
+    python check_progress.py --num-gpus 2     # override GPU count for ETA
 """
 
 import argparse
 import os
 import re
+import shutil
+import subprocess
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # Expected total: 10 events × 4 budgets × 3 seeds = 120 studies
 TOTAL_STUDIES = 120
+
+# Display width — adapts to terminal, minimum 90 for readability
+WIDTH = max(shutil.get_terminal_size((100, 24)).columns, 90)
 
 
 def parse_timestamp(line: str):
@@ -145,6 +151,31 @@ def format_duration(seconds: float) -> str:
         return f"{int(h)}h {int(m)}m"
 
 
+def detect_gpu_info() -> list:
+    """Detect GPU names and memory via nvidia-smi. Returns list of dicts."""
+    gpus = []
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=index,name,memory.total,memory.used,utilization.gpu",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.strip().split("\n"):
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) >= 5:
+                    gpus.append({
+                        "index": int(parts[0]),
+                        "name": parts[1],
+                        "mem_total_mb": int(parts[2]),
+                        "mem_used_mb": int(parts[3]),
+                        "util_pct": int(parts[4]),
+                    })
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        pass
+    return gpus
+
+
 def find_study_logs(results_dir: str) -> list:
     """Find all study.log files under the per-experiment results directory."""
     base = Path(results_dir) / "optuna" / "per_experiment"
@@ -155,9 +186,10 @@ def find_study_logs(results_dir: str) -> list:
     return logs
 
 
-def print_progress(results_dir: str):
+def print_progress(results_dir: str, num_gpus_override: int = None):
     """Parse all study logs and print a progress report."""
     logs = find_study_logs(results_dir)
+    w = WIDTH
 
     if not logs:
         print(f"No study.log files found under {results_dir}/optuna/per_experiment/")
@@ -173,7 +205,6 @@ def print_progress(results_dir: str):
 
     # Aggregate stats
     total_trials_done = sum(s["completed_trials"] for s in studies)
-    total_trials_target = sum(s["target_trials"] for s in studies)
     all_durations = []
     for s in studies:
         all_durations.extend(s["trial_durations"])
@@ -183,11 +214,25 @@ def print_progress(results_dir: str):
     total_expected_trials = TOTAL_STUDIES * trials_per_study
     not_started = TOTAL_STUDIES - len(studies)
 
+    # GPU info
+    gpus = detect_gpu_info()
+
     # Header
     now = datetime.now()
-    print(f"\n{'='*72}")
+    print(f"\n{'=' * w}")
     print(f"  Optuna Per-Experiment Progress  |  {now.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{'='*72}")
+    print(f"{'=' * w}")
+
+    # Device info
+    if gpus:
+        print(f"\n  Devices:")
+        for g in gpus:
+            mem_pct = g["mem_used_mb"] / g["mem_total_mb"] * 100 if g["mem_total_mb"] > 0 else 0
+            print(f"    cuda:{g['index']}  {g['name']:<30}  "
+                  f"mem {g['mem_used_mb']:,}/{g['mem_total_mb']:,} MB ({mem_pct:.0f}%)  "
+                  f"util {g['util_pct']}%")
+    else:
+        print(f"\n  Devices:  (nvidia-smi not available)")
 
     # Overall summary
     print(f"\n  Studies:  {len(completed)} done, {len(in_progress)} running, "
@@ -211,8 +256,13 @@ def print_progress(results_dir: str):
 
         remaining_trials = total_expected_trials - total_trials_done
         if remaining_trials > 0:
-            # Account for parallelism: check how many studies run concurrently
-            n_parallel = max(len(in_progress), 1)
+            # Parallelism: use override, or detected GPU count, or concurrent studies
+            if num_gpus_override:
+                n_parallel = num_gpus_override
+            elif gpus:
+                n_parallel = len(gpus)
+            else:
+                n_parallel = max(len(in_progress), 1)
             # Sequential time for remaining trials
             seq_seconds = remaining_trials * avg_trial
             # Parallel estimate: divide by concurrent workers
@@ -224,22 +274,17 @@ def print_progress(results_dir: str):
 
     # In-progress studies detail
     if in_progress:
-        print(f"\n  {'─'*68}")
+        print(f"\n  {'─' * (w - 4)}")
         print(f"  RUNNING ({len(in_progress)} studies):")
-        print(f"  {'─'*68}")
+        print(f"  {'─' * (w - 4)}")
         for s in in_progress:
             name = f"{s['event']} b={s['budget']} s={s['seed']}"
             trial_str = f"trial {s['current_trial']}/{s['target_trials']}"
             phase_str = s["current_phase"] or "?"
             epoch_str = f" ep {s['current_epoch']}" if s["current_epoch"] else ""
 
-            # Time elapsed on current trial
+            # Total elapsed time for the study
             elapsed = ""
-            if s["last_timestamp"] and s["trial_durations"]:
-                # Time since last completed trial
-                last_done_ts = s["study_start"]
-                for dur in s["trial_durations"]:
-                    last_done_ts = last_done_ts + timedelta(seconds=dur) if last_done_ts else None
             if s["last_timestamp"] and s["study_start"]:
                 total_elapsed = (s["last_timestamp"] - s["study_start"]).total_seconds()
                 elapsed = f" [{format_duration(total_elapsed)} elapsed]"
@@ -248,9 +293,9 @@ def print_progress(results_dir: str):
 
     # Completed studies - compact summary
     if completed:
-        print(f"\n  {'─'*68}")
+        print(f"\n  {'─' * (w - 4)}")
         print(f"  COMPLETED ({len(completed)} studies):")
-        print(f"  {'─'*68}")
+        print(f"  {'─' * (w - 4)}")
 
         # Group by event for readability
         by_event = {}
@@ -259,20 +304,19 @@ def print_progress(results_dir: str):
 
         for event in sorted(by_event):
             entries = sorted(by_event[event], key=lambda x: (x["budget"], x["seed"]))
-            configs = ", ".join(f"b{s['budget']}s{s['seed']}" for s in entries)
             avg_f1 = sum(s["best_f1"] for s in entries) / len(entries)
             print(f"    {event:<40} [{len(entries)}] avg_best_f1={avg_f1:.4f}")
 
     # Failed studies
     if failed:
-        print(f"\n  {'─'*68}")
+        print(f"\n  {'─' * (w - 4)}")
         print(f"  FAILED ({len(failed)} studies):")
-        print(f"  {'─'*68}")
+        print(f"  {'─' * (w - 4)}")
         for s in failed:
             name = f"{s['event']} b={s['budget']} s={s['seed']}"
             print(f"    {name}")
 
-    print(f"\n{'='*72}\n")
+    print(f"\n{'=' * w}\n")
 
 
 def main():
@@ -295,19 +339,25 @@ def main():
         default=30,
         help="Refresh interval in seconds for --watch (default: 30)",
     )
+    parser.add_argument(
+        "--num-gpus",
+        type=int,
+        default=None,
+        help="Override GPU count for ETA calculation (default: auto-detect via nvidia-smi)",
+    )
     args = parser.parse_args()
 
     if args.watch:
         try:
             while True:
                 os.system("cls" if os.name == "nt" else "clear")
-                print_progress(args.results_dir)
+                print_progress(args.results_dir, args.num_gpus)
                 print(f"  (refreshing every {args.interval}s — Ctrl+C to stop)")
                 time.sleep(args.interval)
         except KeyboardInterrupt:
             print("\nStopped.")
     else:
-        print_progress(args.results_dir)
+        print_progress(args.results_dir, args.num_gpus)
 
 
 if __name__ == "__main__":

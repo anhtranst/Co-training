@@ -37,34 +37,72 @@ def _make_result(event="test_event", budget=5, seed_set=1, **overrides):
     return result
 
 
-class TestGPURoundRobinAssignment(unittest.TestCase):
-    """Test that experiments get assigned to GPUs round-robin."""
+class TestGPUDynamicAssignment(unittest.TestCase):
+    """Test that experiments get assigned to GPUs dynamically."""
 
-    def test_2_gpus_6_experiments(self):
+    def test_2_gpus_6_experiments_all_gpus_used(self):
+        """With 2 GPUs and 6 experiments, both cuda:0 and cuda:1 are used."""
         configs = [{"event": "e", "budget": b, "seed_set": s}
                    for b in [5, 10] for s in [1, 2, 3]]
+        # Simulate the seeding logic: first num_gpus configs get one GPU each
         num_gpus = 2
-        for i, cfg in enumerate(configs):
-            cfg["device"] = f"cuda:{i % num_gpus}"
-        devices = [c["device"] for c in configs]
-        self.assertEqual(devices, [
-            "cuda:0", "cuda:1", "cuda:0", "cuda:1", "cuda:0", "cuda:1",
-        ])
+        for gpu_id in range(min(num_gpus, len(configs))):
+            configs[gpu_id]["device"] = f"cuda:{gpu_id}"
+        self.assertEqual(configs[0]["device"], "cuda:0")
+        self.assertEqual(configs[1]["device"], "cuda:1")
 
     def test_3_gpus_3_experiments(self):
+        """With 3 GPUs and 3 experiments, each gets a unique GPU."""
         configs = [{"event": "e", "budget": 5, "seed_set": s}
                    for s in [1, 2, 3]]
         num_gpus = 3
-        for i, cfg in enumerate(configs):
-            cfg["device"] = f"cuda:{i % num_gpus}"
+        for gpu_id in range(min(num_gpus, len(configs))):
+            configs[gpu_id]["device"] = f"cuda:{gpu_id}"
         devices = [c["device"] for c in configs]
         self.assertEqual(devices, ["cuda:0", "cuda:1", "cuda:2"])
 
     def test_1_gpu_all_same(self):
+        """With 1 GPU, all experiments run on cuda:0."""
         configs = [{"event": "e"} for _ in range(4)]
-        for i, cfg in enumerate(configs):
-            cfg["device"] = f"cuda:{i % 1}"
-        self.assertTrue(all(c["device"] == "cuda:0" for c in configs))
+        # With 1 GPU only the first is seeded; the rest inherit on completion
+        configs[0]["device"] = "cuda:0"
+        self.assertEqual(configs[0]["device"], "cuda:0")
+
+    def test_freed_gpu_reused(self):
+        """When a GPU finishes, the next task gets that same GPU."""
+        # Simulate: 2 GPUs, GPU 1 finishes first, task 2 should get GPU 1
+        assigned_devices = []
+        config_queue = list(range(4))  # 4 tasks total
+        num_gpus = 2
+
+        # Seed: task 0 -> GPU 0, task 1 -> GPU 1
+        active = {}
+        for gpu_id in range(min(num_gpus, len(config_queue))):
+            idx = config_queue.pop(0)
+            active[idx] = gpu_id
+            assigned_devices.append((idx, gpu_id))
+
+        # GPU 1 finishes first -> task 2 gets GPU 1
+        finished_idx = 1
+        freed_gpu = active.pop(finished_idx)
+        if config_queue:
+            next_idx = config_queue.pop(0)
+            active[next_idx] = freed_gpu
+            assigned_devices.append((next_idx, freed_gpu))
+
+        # GPU 0 finishes -> task 3 gets GPU 0
+        finished_idx = 0
+        freed_gpu = active.pop(finished_idx)
+        if config_queue:
+            next_idx = config_queue.pop(0)
+            active[next_idx] = freed_gpu
+            assigned_devices.append((next_idx, freed_gpu))
+
+        self.assertEqual(assigned_devices, [
+            (0, 0), (1, 1),  # initial seeding
+            (2, 1),          # GPU 1 freed, task 2 gets it
+            (3, 0),          # GPU 0 freed, task 3 gets it
+        ])
 
 
 class TestRunAllParallelDispatch(unittest.TestCase):

@@ -651,11 +651,12 @@ def _run_studies_parallel(
     num_gpus: int,
     on_study_done: Optional[Callable],
 ) -> Dict[Tuple[str, int, int], dict]:
-    """Dispatch studies across GPUs using ProcessPoolExecutor."""
-    # Assign GPUs round-robin
-    for i, cfg in enumerate(pending_configs):
-        cfg["device"] = f"cuda:{i % num_gpus}"
+    """Dispatch studies across GPUs using ProcessPoolExecutor.
 
+    GPU assignment is done dynamically: when a study on cuda:X finishes,
+    the next pending study is assigned to cuda:X.  This ensures GPUs stay
+    balanced even when studies have very different runtimes.
+    """
     print(
         f"Running {len(pending_configs)} Optuna studies in parallel "
         f"across {num_gpus} GPUs..."
@@ -663,48 +664,69 @@ def _run_studies_parallel(
 
     ctx = mp.get_context("spawn")
     results_map: Dict[int, dict] = {}
+    config_queue = list(range(len(pending_configs)))  # indices
 
     with ProcessPoolExecutor(
         max_workers=num_gpus, mp_context=ctx
     ) as executor:
-        future_to_idx = {}
-        for idx, cfg in enumerate(pending_configs):
-            future = executor.submit(_run_study_worker, cfg)
-            future_to_idx[future] = idx
+        active: Dict = {}   # future -> (config_idx, gpu_id)
 
-        for future in as_completed(future_to_idx):
-            idx = future_to_idx[future]
-            key = pending_keys[idx]
-            try:
-                result = future.result()
-            except Exception as e:
-                cfg = pending_configs[idx]
-                result = {
-                    "event": cfg["event"],
-                    "budget": cfg["budget"],
-                    "seed_set": cfg["seed_set"],
-                    "status": "failed",
-                    "best_params": None,
-                    "best_value": None,
-                    "n_trials": 0,
-                    "trials": [],
-                }
-                logger.error(f"Process-level failure for study {idx}: {e}")
+        # Seed the pool: one task per GPU
+        for gpu_id in range(min(num_gpus, len(config_queue))):
+            idx = config_queue.pop(0)
+            pending_configs[idx]["device"] = f"cuda:{gpu_id}"
+            future = executor.submit(_run_study_worker, pending_configs[idx])
+            active[future] = (idx, gpu_id)
 
-            results_map[idx] = result
+        while active:
+            # Wait for the next completion
+            for future in as_completed(active):
+                idx, gpu_id = active.pop(future)
+                key = pending_keys[idx]
 
-            status = result["status"]
-            best_val = result.get("best_value")
-            val_str = f" (best_dev_f1={best_val:.4f})" if best_val else ""
-            print(
-                f"  {key[0]} budget={key[1]} seed={key[2]}"
-                f" -- {status}{val_str}"
-            )
-            if status == "failed" and result.get("error"):
-                print(f"    ERROR: {result['error']}")
+                try:
+                    result = future.result()
+                except Exception as e:
+                    cfg = pending_configs[idx]
+                    result = {
+                        "event": cfg["event"],
+                        "budget": cfg["budget"],
+                        "seed_set": cfg["seed_set"],
+                        "status": "failed",
+                        "best_params": None,
+                        "best_value": None,
+                        "n_trials": 0,
+                        "trials": [],
+                    }
+                    logger.error(f"Process-level failure for study {idx}: {e}")
 
-            if on_study_done is not None:
-                on_study_done(key[0], key[1], key[2], status)
+                results_map[idx] = result
+
+                status = result["status"]
+                best_val = result.get("best_value")
+                val_str = f" (best_dev_f1={best_val:.4f})" if best_val else ""
+                print(
+                    f"  {key[0]} budget={key[1]} seed={key[2]}"
+                    f" -- {status}{val_str}"
+                )
+                if status == "failed" and result.get("error"):
+                    print(f"    ERROR: {result['error']}")
+
+                if on_study_done is not None:
+                    on_study_done(key[0], key[1], key[2], status)
+
+                # Submit next study to the same GPU that just freed up
+                if config_queue:
+                    next_idx = config_queue.pop(0)
+                    pending_configs[next_idx]["device"] = f"cuda:{gpu_id}"
+                    new_future = executor.submit(
+                        _run_study_worker, pending_configs[next_idx]
+                    )
+                    active[new_future] = (next_idx, gpu_id)
+
+                # Process one completion at a time so the freed GPU
+                # gets its next task immediately
+                break
 
     # Build lookup by key
     return {pending_keys[i]: results_map[i] for i in range(len(pending_configs))}

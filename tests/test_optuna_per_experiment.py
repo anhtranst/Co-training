@@ -532,27 +532,47 @@ class TestStudyWorkerPicklable(unittest.TestCase):
 
 
 class TestGPUAssignmentForStudies(unittest.TestCase):
-    """Verify round-robin GPU assignment across studies."""
+    """Verify dynamic GPU assignment across studies."""
 
-    def test_2_gpus_6_studies(self):
+    def test_2_gpus_initial_seeding(self):
+        """First num_gpus studies each get a unique GPU."""
         configs = [{"event": "e", "budget": b, "seed_set": s}
                    for b in [5, 10] for s in [1, 2, 3]]
         num_gpus = 2
-        for i, cfg in enumerate(configs):
-            cfg["device"] = f"cuda:{i % num_gpus}"
-        devices = [c["device"] for c in configs]
-        self.assertEqual(devices, [
-            "cuda:0", "cuda:1", "cuda:0", "cuda:1", "cuda:0", "cuda:1",
-        ])
+        for gpu_id in range(min(num_gpus, len(configs))):
+            configs[gpu_id]["device"] = f"cuda:{gpu_id}"
+        self.assertEqual(configs[0]["device"], "cuda:0")
+        self.assertEqual(configs[1]["device"], "cuda:1")
 
     def test_3_gpus_3_studies(self):
+        """With 3 GPUs and 3 studies, each gets a unique GPU."""
         configs = [{"event": "e", "budget": 5, "seed_set": s}
                    for s in [1, 2, 3]]
         num_gpus = 3
-        for i, cfg in enumerate(configs):
-            cfg["device"] = f"cuda:{i % num_gpus}"
+        for gpu_id in range(min(num_gpus, len(configs))):
+            configs[gpu_id]["device"] = f"cuda:{gpu_id}"
         devices = [c["device"] for c in configs]
         self.assertEqual(devices, ["cuda:0", "cuda:1", "cuda:2"])
+
+    def test_freed_gpu_reused(self):
+        """When a GPU finishes, the next study gets that same GPU."""
+        config_queue = list(range(4))
+        num_gpus = 2
+        active = {}
+        assigned = []
+
+        for gpu_id in range(min(num_gpus, len(config_queue))):
+            idx = config_queue.pop(0)
+            active[idx] = gpu_id
+            assigned.append((idx, gpu_id))
+
+        # GPU 0 finishes -> task 2 gets GPU 0
+        freed_gpu = active.pop(0)
+        next_idx = config_queue.pop(0)
+        active[next_idx] = freed_gpu
+        assigned.append((next_idx, freed_gpu))
+
+        self.assertEqual(assigned[2], (2, 0))  # task 2 on GPU 0
 
 
 class TestAllStudiesSkipsCompleted(unittest.TestCase):
