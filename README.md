@@ -400,20 +400,41 @@ python -m lg_cotrain.run_experiment \
 
 #### Per-experiment tuning (120 separate studies)
 
-Find experiment-specific optimal hyperparameters — one Optuna study per (event, budget, seed_set) combination. Each study optimizes `dev_macro_f1` over 6 hyperparameters (lr, batch_size, cotrain_epochs, finetune_patience, weight_decay, warmup_ratio). Studies run in parallel across GPUs:
+Find experiment-specific optimal hyperparameters — one Optuna study per (event, budget, seed_set) combination. Each study optimizes `dev_macro_f1` over 6 hyperparameters (lr, batch_size, cotrain_epochs, finetune_patience, weight_decay, warmup_ratio). Studies run in parallel across GPUs and support **incremental scaling**:
 
 ```bash
-# Run all 120 studies with 15 trials each on 2 GPUs
-python -m lg_cotrain.optuna_per_experiment --n-trials 15 --num-gpus 2
+# Run all 120 studies with 10 trials each on 2 GPUs
+python -m lg_cotrain.optuna_per_experiment --n-trials 10 --num-gpus 2
+
+# Later, scale to 20 trials (continues from 10, only runs 10 new trials per study)
+python -m lg_cotrain.optuna_per_experiment --n-trials 20 --num-gpus 2
 
 # Tune a subset
 python -m lg_cotrain.optuna_per_experiment --n-trials 10 \
     --events hurricane_harvey_2017 --budgets 50 --seed-sets 1
-
-# Resume is automatic — existing best_params.json files are skipped
 ```
 
-Results are saved as `best_params.json` in `results/optuna/per_experiment/{event}/{budget}_set{seed}/`. Use `load_best_params()` to load all results for final experiments.
+Results are saved under `results/optuna/per_experiment/{event}/{budget}_set{seed}/trials_{n}/best_params.json`. Each trial count gets its own subfolder — previous results are never overwritten. Use `load_best_params()` to load the latest results, or `load_best_params(n_trials=10)` for a specific trial count.
+
+#### Monitoring progress
+
+While Optuna studies are running, use the standalone progress checker to see trial-level progress and ETA:
+
+```bash
+# One-time snapshot
+python check_progress.py
+
+# Auto-refresh every 30 seconds
+python check_progress.py --watch
+
+# Custom refresh interval
+python check_progress.py --watch --interval 10
+
+# Custom results directory
+python check_progress.py --results-dir /path/to/results
+```
+
+The script scans `study.log` files across all 120 studies and reports: completed/running/pending studies, total trial progress with a progress bar, average trial duration, estimated time remaining (accounting for GPU parallelism), and per-study detail showing current phase and epoch. It is read-only and does not modify any files.
 
 ### All CLI Options
 
@@ -455,7 +476,7 @@ Eight Jupyter notebooks are provided in the `Notebooks/` directory:
 | `04_alternative_stopping_strategies.ipynb` | **Quick comparison** of all 6 stopping strategies (budget=50, seed=1, all 10 events = 60 runs). Results stored in `results/{source}/quick-stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 | `05_stopping_strategies_full_run.ipynb` | **Full sweep** across all stopping strategies (all budgets × seeds × events × strategies = 720 runs). Results stored in `results/{source}/stop/{strategy}/`. Includes `ProgressTracker` for elapsed time and ETA. |
 | `06_all_disasters_adamw_run.ipynb` | **Full 120-experiment run with AdamW** optimizer, linear LR scheduler, and 10% warmup (run-3). Uses baseline stopping strategy, paper-default hyperparameters, and **multi-GPU parallel execution** (`NUM_GPUS=2`). Results stored in `results/gpt-4o/test/run-3/`. |
-| `07_optuna_per_experiment.ipynb` | **Per-experiment Optuna tuning**: 120 separate studies (one per event/budget/seed), each optimizing 6 hyperparameters (lr, batch_size, cotrain_epochs, finetune_patience, weight_decay, warmup_ratio) over N trials. Multi-GPU parallel execution. Results saved as `best_params.json` in `results/optuna/per_experiment/`. |
+| `07_optuna_per_experiment.ipynb` | **Per-experiment Optuna tuning**: 120 separate studies (one per event/budget/seed), each optimizing 6 hyperparameters (lr, batch_size, cotrain_epochs, finetune_patience, weight_decay, warmup_ratio) over N trials. Multi-GPU parallel execution. **Incremental scaling**: results stored under `trials_{n}/` subfolders; running with more trials continues from previous runs. |
 
 All notebooks support **resume** — if interrupted, they skip experiments that already have `metrics.json` files.
 
@@ -586,6 +607,8 @@ Notebooks/
 ├── 06_all_disasters_adamw_run.ipynb             # AdamW + linear scheduler run-3 (multi-GPU parallel)
 └── 07_optuna_per_experiment.ipynb               # Per-experiment Optuna tuning (120 studies, multi-GPU)
 
+check_progress.py                    # Standalone Optuna progress checker (study.log scanner with ETA)
+
 tests/                               # 400+ tests across 16 test files
 ├── conftest.py                      # Shared pytest fixtures
 ├── test_config.py                   # Config dataclass path computation and defaults (28 tests)
@@ -596,7 +619,7 @@ tests/                               # 400+ tests across 16 test files
 ├── test_model.py                    # BertClassifier forward/predict_proba (4 tests)
 ├── test_notebook.py                 # Notebook 01 + 03 structure and content validation (56 tests)
 ├── test_notebook_02.py              # Notebook 02 structure validation (22 tests)
-├── test_optuna_per_experiment.py     # Per-experiment Optuna tuner, resume, GPU assignment, load_best_params (16 tests)
+├── test_optuna_per_experiment.py     # Per-experiment Optuna tuner, incremental trials, resume, GPU assignment, load_best_params (31 tests)
 ├── test_parallel.py                 # Multi-GPU parallel dispatch, resume, round-robin, callbacks (11 tests)
 ├── test_run_all.py                  # Batch runner, custom budgets/seeds/source (25 tests)
 ├── test_run_experiment.py           # CLI argument parsing and forwarding (12 tests)
@@ -709,7 +732,7 @@ python -m unittest tests/test_evaluate.py
 
 - **3-level results hierarchy**: Results are organized in a 3-level folder structure (`results/{model}/{type}/{experiment}/`) instead of flat names. For example, `results/gpt-4o/quick-stop/baseline/` instead of `results/gpt-4o-quick-stop-baseline/`. The dashboard uses nested tab bars (model → type → experiment) to navigate without horizontal overflow.
 
-- **Optuna tuners**: Two self-contained Optuna tuning modes are available. `optuna_tuner.py` runs a global study (mean dev macro-F1 across all events) to find one set of hyperparameters. `optuna_per_experiment.py` runs 120 separate studies (one per event/budget/seed) to find experiment-specific optimal hyperparameters over 6 dimensions. Both use dev macro-F1 as the objective (no test-set leakage). Per-experiment studies run in parallel across GPUs and save results as JSON files with resume support.
+- **Optuna tuners**: Two self-contained Optuna tuning modes are available. `optuna_tuner.py` runs a global study (mean dev macro-F1 across all events) to find one set of hyperparameters. `optuna_per_experiment.py` runs 120 separate studies (one per event/budget/seed) to find experiment-specific optimal hyperparameters over 6 dimensions. Both use dev macro-F1 as the objective (no test-set leakage). Per-experiment studies run in parallel across GPUs, save results as JSON under `trials_{n}/` subfolders, and support incremental scaling — running with more trials continues from previous runs (via `study.add_trial()` replay).
 
 - **Resume support**: Both `run_all_experiments()` and the notebooks skip experiments whose `metrics.json` already exists, making it safe to restart after crashes.
 

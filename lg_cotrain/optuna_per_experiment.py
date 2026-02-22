@@ -4,20 +4,28 @@ Runs 120 separate Optuna studies — one for each (event, budget, seed_set)
 combination — to find experiment-specific optimal hyperparameters.  Studies
 run in parallel across multiple GPUs using ProcessPoolExecutor.
 
-Results are saved as JSON files (no database).  Resume is handled by checking
-for existing ``best_params.json`` files.
+Results are saved as JSON files (no database) under ``trials_{n}/``
+subfolders.  **Incremental scaling** is built-in: running with a higher
+``n_trials`` automatically continues from the latest previous run, replaying
+earlier trials into the TPE sampler so only the delta needs to execute.
 
 Usage::
 
-    python -m lg_cotrain.optuna_per_experiment --n-trials 15 --num-gpus 2
+    # First run: 10 trials each
+    python -m lg_cotrain.optuna_per_experiment --n-trials 10 --num-gpus 2
+
+    # Later: scale to 20 trials (only 10 new trials per study)
+    python -m lg_cotrain.optuna_per_experiment --n-trials 20 --num-gpus 2
+
+    # Subset
     python -m lg_cotrain.optuna_per_experiment --n-trials 10 --events hurricane_harvey_2017
-    python -m lg_cotrain.optuna_per_experiment --n-trials 15 --budget 50 --seed-set 1
 """
 
 import argparse
 import json
 import logging
 import multiprocessing as mp
+import re
 import tempfile
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -41,6 +49,170 @@ ALL_EVENTS = [
 
 BUDGETS = [5, 10, 25, 50]
 SEED_SETS = [1, 2, 3]
+
+# Canonical search space — used by the objective function and by
+# _replay_trials_into_study() to reconstruct Optuna distributions.
+SEARCH_SPACE = {
+    "lr": {"type": "float", "low": 1e-5, "high": 1e-3, "log": True},
+    "batch_size": {"type": "categorical", "choices": [8, 16, 32, 64]},
+    "cotrain_epochs": {"type": "int", "low": 5, "high": 20},
+    "finetune_patience": {"type": "int", "low": 4, "high": 10},
+    "weight_decay": {"type": "float", "low": 0.0, "high": 0.1},
+    "warmup_ratio": {"type": "float", "low": 0.0, "high": 0.3},
+}
+
+
+def _build_distributions():
+    """Build Optuna distribution objects from SEARCH_SPACE.
+
+    Returns a dict of ``{param_name: optuna.distributions.*Distribution}``.
+    Requires optuna to be importable.
+    """
+    import optuna.distributions as dist
+
+    distributions = {}
+    for name, spec in SEARCH_SPACE.items():
+        if spec["type"] == "float":
+            distributions[name] = dist.FloatDistribution(
+                low=spec["low"], high=spec["high"], log=spec.get("log", False),
+            )
+        elif spec["type"] == "int":
+            distributions[name] = dist.IntDistribution(
+                low=spec["low"], high=spec["high"],
+            )
+        elif spec["type"] == "categorical":
+            distributions[name] = dist.CategoricalDistribution(
+                choices=spec["choices"],
+            )
+    return distributions
+
+
+def _find_latest_trials(experiment_dir: Path) -> Optional[Tuple[int, dict]]:
+    """Find the ``trials_*`` subfolder with the highest trial count.
+
+    Parameters
+    ----------
+    experiment_dir : Path
+        e.g. ``results/optuna/per_experiment/hurricane_harvey_2017/50_set1``
+
+    Returns
+    -------
+    ``(n_trials, data_dict)`` from the best_params.json of the highest
+    trial-count folder, or ``None`` if no completed trials exist.
+    """
+    if not experiment_dir.is_dir():
+        return None
+
+    best_n = 0
+    best_data = None
+
+    for child in experiment_dir.iterdir():
+        if not child.is_dir():
+            continue
+        match = re.match(r"^trials_(\d+)$", child.name)
+        if match is None:
+            continue
+        n = int(match.group(1))
+        bp_path = child / "best_params.json"
+        if bp_path.exists() and n > best_n:
+            best_n = n
+            with open(bp_path) as f:
+                best_data = json.load(f)
+
+    if best_data is None:
+        return None
+    return (best_n, best_data)
+
+
+def _replay_trials_into_study(study, trials_info: List[dict]):
+    """Replay previously saved trial records into an Optuna study.
+
+    This feeds the TPE sampler with historical observations so it can
+    make informed suggestions for new trials.
+
+    Parameters
+    ----------
+    study : optuna.Study
+        An in-memory study (typically freshly created).
+    trials_info : list of dict
+        Trial records as saved in ``best_params.json["trials"]``.
+        Each must have ``"number"``, ``"params"``, and ``"dev_macro_f1"`` keys.
+    """
+    from optuna.trial import create_trial, TrialState
+    from datetime import datetime
+
+    distributions = _build_distributions()
+
+    for t_info in trials_info:
+        if t_info.get("state", "COMPLETE") != "COMPLETE":
+            continue
+        frozen = create_trial(
+            state=TrialState.COMPLETE,
+            params=t_info["params"],
+            distributions=distributions,
+            values=[t_info["dev_macro_f1"]],
+        )
+        study.add_trial(frozen)
+
+
+def _setup_study_logging(log_path: str):
+    """Set up a persistent log file for an Optuna study.
+
+    Replaces any existing FileHandlers on the ``lg_cotrain`` logger with
+    a single handler that writes to *log_path* (inside the project's
+    results folder, not a temp directory).  This ensures:
+
+    1. All trials within a study log to the same persistent file.
+    2. ``tempfile.TemporaryDirectory`` cleanup doesn't conflict with
+       open file handles (Windows PermissionError fix).
+    3. The user can ``tail -f`` the log to monitor live progress.
+
+    Returns the created FileHandler so it can be closed after the study.
+    """
+    lgr = logging.getLogger("lg_cotrain")
+
+    # Remove any existing FileHandlers (e.g. from a previous study or
+    # from setup_logging pointing at a temp dir)
+    for h in lgr.handlers[:]:
+        if isinstance(h, logging.FileHandler):
+            h.close()
+            lgr.removeHandler(h)
+
+    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+    fh = logging.FileHandler(log_path)
+    fh.setLevel(logging.INFO)
+    fmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    fh.setFormatter(fmt)
+    lgr.addHandler(fh)
+
+    # Ensure a StreamHandler exists (setup_logging's if-not-handlers
+    # guard may have been skipped after handler removal)
+    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+               for h in lgr.handlers):
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        ch.setFormatter(fmt)
+        lgr.addHandler(ch)
+
+    lgr.setLevel(logging.INFO)
+    return fh
+
+
+def _close_temp_file_handlers(logger_instance):
+    """Close and remove FileHandlers pointing at temp directories.
+
+    Called after each trial so ``tempfile.TemporaryDirectory`` cleanup
+    can delete the temp dir on Windows.  The persistent study log handler
+    (set up by ``_setup_study_logging``) is left untouched because its
+    path is in the project results folder, not a temp dir.
+    """
+    for handler in logger_instance.handlers[:]:
+        if isinstance(handler, logging.FileHandler):
+            # Only remove handlers whose file is inside a temp directory
+            handler_path = getattr(handler, 'baseFilename', '')
+            if tempfile.gettempdir() in handler_path:
+                handler.close()
+                logger_instance.removeHandler(handler)
 
 
 def create_per_experiment_objective(
@@ -70,13 +242,34 @@ def create_per_experiment_objective(
     """
 
     def objective(trial):
-        # Sample hyperparameters
-        lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [8, 16, 32, 64])
-        cotrain_epochs = trial.suggest_int("cotrain_epochs", 5, 20)
-        finetune_patience = trial.suggest_int("finetune_patience", 4, 10)
-        weight_decay = trial.suggest_float("weight_decay", 0.0, 0.1)
-        warmup_ratio = trial.suggest_float("warmup_ratio", 0.0, 0.3)
+        # Sample hyperparameters using the canonical search space
+        lr = trial.suggest_float(
+            "lr", SEARCH_SPACE["lr"]["low"], SEARCH_SPACE["lr"]["high"],
+            log=SEARCH_SPACE["lr"].get("log", False),
+        )
+        batch_size = trial.suggest_categorical(
+            "batch_size", SEARCH_SPACE["batch_size"]["choices"],
+        )
+        cotrain_epochs = trial.suggest_int(
+            "cotrain_epochs",
+            SEARCH_SPACE["cotrain_epochs"]["low"],
+            SEARCH_SPACE["cotrain_epochs"]["high"],
+        )
+        finetune_patience = trial.suggest_int(
+            "finetune_patience",
+            SEARCH_SPACE["finetune_patience"]["low"],
+            SEARCH_SPACE["finetune_patience"]["high"],
+        )
+        weight_decay = trial.suggest_float(
+            "weight_decay",
+            SEARCH_SPACE["weight_decay"]["low"],
+            SEARCH_SPACE["weight_decay"]["high"],
+        )
+        warmup_ratio = trial.suggest_float(
+            "warmup_ratio",
+            SEARCH_SPACE["warmup_ratio"]["low"],
+            SEARCH_SPACE["warmup_ratio"]["high"],
+        )
 
         # Use a temp directory so trial outputs don't pollute real results
         with tempfile.TemporaryDirectory() as tmp_results:
@@ -106,6 +299,11 @@ def create_per_experiment_objective(
 
             result = trainer.run()
 
+            # Close FileHandlers pointing at the temp dir before cleanup.
+            # On Windows, open handles prevent directory deletion.
+            # The persistent study log handler is left untouched.
+            _close_temp_file_handlers(logging.getLogger("lg_cotrain"))
+
         return result["dev_macro_f1"]
 
     return objective
@@ -126,23 +324,28 @@ def run_single_study(
     """Run one Optuna study for a single (event, budget, seed_set).
 
     Creates an in-memory Optuna study, runs *n_trials* trials, saves
-    ``best_params.json`` with best parameters, best value, and all trial
-    results.  If ``best_params.json`` already exists, the study is skipped
-    and the existing results are returned.
+    ``best_params.json`` under ``trials_{n_trials}/``.
+
+    **Incremental support**: If a previous ``trials_k/best_params.json``
+    exists with ``k < n_trials``, those *k* trials are replayed into the
+    new study (feeding the TPE sampler) and only ``n_trials - k`` new
+    trials are executed.  If ``k >= n_trials``, the study is skipped.
 
     Parameters
     ----------
     on_trial_done : callable, optional
-        Called after each trial with ``(trial_number, n_trials, dev_f1)``.
+        Called after each *new* trial with ``(trial_number, n_trials, dev_f1)``.
 
     Returns
     -------
     dict with keys: event, budget, seed_set, status, best_params, best_value,
     n_trials, trials.
     """
-    # Check for existing results (resume) — before importing optuna
-    output_dir = Path(storage_dir) / event / f"{budget}_set{seed_set}"
+    experiment_dir = Path(storage_dir) / event / f"{budget}_set{seed_set}"
+    output_dir = experiment_dir / f"trials_{n_trials}"
     best_params_path = output_dir / "best_params.json"
+
+    # Skip if exact trial count already done
     if best_params_path.exists():
         with open(best_params_path) as f:
             return json.load(f)
@@ -157,6 +360,36 @@ def run_single_study(
         direction="maximize",
     )
 
+    # Check for previous trials to continue from
+    previous_trials = []
+    previous_n = 0
+    latest = _find_latest_trials(experiment_dir)
+    if latest is not None:
+        previous_n, prev_data = latest
+        if previous_n >= n_trials:
+            # Already have enough trials — return the previous results
+            return prev_data
+        previous_trials = prev_data.get("trials", [])
+        _replay_trials_into_study(study, previous_trials)
+        logger.info(
+            f"Replayed {len(previous_trials)} trials from trials_{previous_n} "
+            f"into study for {event} b={budget} s={seed_set}"
+        )
+
+    new_trials_needed = n_trials - len(previous_trials)
+
+    # Set up persistent study log in the project results folder.
+    # This file survives across trials and lets you monitor progress with
+    # e.g.  tail -f results/optuna/per_experiment/{event}/{budget}_set{seed}/study.log
+    output_dir.mkdir(parents=True, exist_ok=True)
+    study_log_path = str(output_dir / "study.log")
+    study_fh = _setup_study_logging(study_log_path)
+    logger.info(
+        f"=== Optuna study: {event} budget={budget} seed={seed_set} | "
+        f"target={n_trials} trials, {len(previous_trials)} replayed, "
+        f"{new_trials_needed} new ==="
+    )
+
     # Wrap objective with callback
     base_objective = create_per_experiment_objective(
         event=event,
@@ -169,14 +402,20 @@ def run_single_study(
     )
 
     def objective_with_callback(trial):
+        logger.info(f"--- Trial {trial.number + 1}/{n_trials} ---")
         dev_f1 = base_objective(trial)
+        logger.info(f"--- Trial {trial.number + 1}/{n_trials} done: dev_macro_f1={dev_f1:.4f} ---")
         if on_trial_done is not None:
             on_trial_done(trial.number, n_trials, dev_f1)
         return dev_f1
 
-    study.optimize(objective_with_callback, n_trials=n_trials)
+    study.optimize(objective_with_callback, n_trials=new_trials_needed)
 
-    # Build result
+    # Close the persistent study log handler
+    study_fh.close()
+    logging.getLogger("lg_cotrain").removeHandler(study_fh)
+
+    # Build result — include ALL trials (replayed + new)
     trials_info = []
     for t in study.trials:
         trial_info = {
@@ -200,6 +439,7 @@ def run_single_study(
         "best_params": study.best_params,
         "best_value": round(study.best_value, 6),
         "n_trials": len(study.trials),
+        "continued_from": previous_n if previous_n > 0 else None,
         "trials": trials_info,
     }
 
@@ -233,8 +473,11 @@ def _run_study_worker(kwargs: dict) -> dict:
             pseudo_label_source=kwargs.get("pseudo_label_source", "gpt-4o"),
         )
     except Exception as e:
+        import traceback
+        error_msg = f"{type(e).__name__}: {e}"
+        error_tb = traceback.format_exc()
         logging.getLogger("lg_cotrain").error(
-            f"Optuna study {event} budget={budget} seed={seed_set} failed: {e}"
+            f"Optuna study {event} budget={budget} seed={seed_set} failed: {error_msg}"
         )
         return {
             "event": event,
@@ -245,6 +488,8 @@ def _run_study_worker(kwargs: dict) -> dict:
             "best_value": None,
             "n_trials": 0,
             "trials": [],
+            "error": error_msg,
+            "traceback": error_tb,
         }
     finally:
         try:
@@ -268,8 +513,9 @@ def run_all_studies(
 ) -> List[dict]:
     """Run per-experiment Optuna studies for all combinations.
 
-    Studies whose ``best_params.json`` already exists are skipped.
-    Pending studies run in parallel across GPUs.
+    Studies whose ``trials_{n_trials}/best_params.json`` already exists
+    are skipped.  Studies with fewer previous trials will continue
+    incrementally.  Pending studies run in parallel across GPUs.
 
     Parameters
     ----------
@@ -297,7 +543,8 @@ def run_all_studies(
         for budget in budgets:
             for seed_set in seed_sets:
                 best_params_path = (
-                    Path(storage_dir) / event / f"{budget}_set{seed_set}" / "best_params.json"
+                    Path(storage_dir) / event / f"{budget}_set{seed_set}"
+                    / f"trials_{n_trials}" / "best_params.json"
                 )
                 if best_params_path.exists():
                     with open(best_params_path) as f:
@@ -306,7 +553,7 @@ def run_all_studies(
                     skipped += 1
                     print(
                         f"  {event} budget={budget} seed={seed_set}"
-                        f" -- SKIPPED (exists)"
+                        f" -- SKIPPED (trials_{n_trials} exists)"
                     )
                     if on_study_done is not None:
                         on_study_done(event, budget, seed_set, "skipped")
@@ -357,7 +604,7 @@ def run_all_studies(
                     else:
                         failed += 1
 
-    # Write summary.json
+    # Write summary_{n_trials}.json
     summary = {
         "total_studies": total,
         "completed": completed + skipped,
@@ -383,7 +630,7 @@ def run_all_studies(
             for r in all_results
         ],
     }
-    summary_path = Path(storage_dir) / "summary.json"
+    summary_path = Path(storage_dir) / f"summary_{n_trials}.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
@@ -453,6 +700,8 @@ def _run_studies_parallel(
                 f"  {key[0]} budget={key[1]} seed={key[2]}"
                 f" -- {status}{val_str}"
             )
+            if status == "failed" and result.get("error"):
+                print(f"    ERROR: {result['error']}")
 
             if on_study_done is not None:
                 on_study_done(key[0], key[1], key[2], status)
@@ -484,6 +733,8 @@ def _run_studies_sequential(
             f"{key[0]} budget={key[1]} seed={key[2]}"
             f" -- {status}{val_str}"
         )
+        if status == "failed" and result.get("error"):
+            print(f"    ERROR: {result['error']}")
 
         if on_study_done is not None:
             on_study_done(key[0], key[1], key[2], status)
@@ -496,8 +747,16 @@ def load_best_params(
     events: Optional[List[str]] = None,
     budgets: Optional[List[int]] = None,
     seed_sets: Optional[List[int]] = None,
+    n_trials: Optional[int] = None,
 ) -> Dict[Tuple[str, int, int], dict]:
     """Load all best_params.json files into a dict.
+
+    Parameters
+    ----------
+    n_trials : int, optional
+        If specified, load from ``trials_{n_trials}/best_params.json``.
+        If ``None`` (default), load from the latest (highest trial-count)
+        ``trials_*/`` subfolder for each experiment.
 
     Returns
     -------
@@ -512,12 +771,19 @@ def load_best_params(
     for event in events:
         for budget in budgets:
             for seed_set in seed_sets:
-                path = (
-                    Path(storage_dir) / event / f"{budget}_set{seed_set}" / "best_params.json"
+                experiment_dir = (
+                    Path(storage_dir) / event / f"{budget}_set{seed_set}"
                 )
-                if path.exists():
-                    with open(path) as f:
-                        results[(event, budget, seed_set)] = json.load(f)
+                if n_trials is not None:
+                    path = experiment_dir / f"trials_{n_trials}" / "best_params.json"
+                    if path.exists():
+                        with open(path) as f:
+                            results[(event, budget, seed_set)] = json.load(f)
+                else:
+                    latest = _find_latest_trials(experiment_dir)
+                    if latest is not None:
+                        _, data = latest
+                        results[(event, budget, seed_set)] = data
 
     return results
 
@@ -527,7 +793,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Per-experiment Optuna hyperparameter tuner for LG-CoTrain. "
         "Runs 120 separate studies (one per event/budget/seed combination) to "
-        "find experiment-specific optimal hyperparameters.",
+        "find experiment-specific optimal hyperparameters.  Supports incremental "
+        "scaling: running with a higher --n-trials continues from previous runs.",
     )
     parser.add_argument(
         "--n-trials", type=int, default=15,

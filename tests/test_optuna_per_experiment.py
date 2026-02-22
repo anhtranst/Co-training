@@ -36,6 +36,25 @@ def _make_result(event="test_event", budget=5, seed_set=1, **overrides):
     return result
 
 
+def _make_trial_info(number, dev_f1=0.80, **param_overrides):
+    """Create a fake trial info dict as stored in best_params.json."""
+    params = {
+        "lr": 0.0001,
+        "batch_size": 32,
+        "cotrain_epochs": 10,
+        "finetune_patience": 5,
+        "weight_decay": 0.01,
+        "warmup_ratio": 0.1,
+    }
+    params.update(param_overrides)
+    return {
+        "number": number,
+        "state": "COMPLETE",
+        "params": params,
+        "dev_macro_f1": dev_f1,
+    }
+
+
 class MockTrial:
     """Mock Optuna trial that records suggest calls."""
 
@@ -106,6 +125,27 @@ class TestSearchSpace(unittest.TestCase):
         objective(trial)
 
         self.assertIn("lr", log_params)
+
+
+class TestSearchSpaceConstant(unittest.TestCase):
+    """Verify the SEARCH_SPACE dict matches what the objective uses."""
+
+    def test_search_space_has_6_params(self):
+        from lg_cotrain.optuna_per_experiment import SEARCH_SPACE
+
+        self.assertEqual(len(SEARCH_SPACE), 6)
+        expected = {"lr", "batch_size", "cotrain_epochs",
+                    "finetune_patience", "weight_decay", "warmup_ratio"}
+        self.assertEqual(set(SEARCH_SPACE.keys()), expected)
+
+    def test_lr_is_log(self):
+        from lg_cotrain.optuna_per_experiment import SEARCH_SPACE
+        self.assertTrue(SEARCH_SPACE["lr"].get("log", False))
+
+    def test_batch_size_is_categorical(self):
+        from lg_cotrain.optuna_per_experiment import SEARCH_SPACE
+        self.assertEqual(SEARCH_SPACE["batch_size"]["type"], "categorical")
+        self.assertEqual(SEARCH_SPACE["batch_size"]["choices"], [8, 16, 32, 64])
 
 
 class TestObjectiveReturnValue(unittest.TestCase):
@@ -182,8 +222,8 @@ class TestBestParamsSaved(unittest.TestCase):
                 _trainer_cls=mock_trainer,
             )
 
-            # Check file was created
-            best_path = Path(tmpdir) / "test_event" / "5_set1" / "best_params.json"
+            # Check file was created under trials_3/
+            best_path = Path(tmpdir) / "test_event" / "5_set1" / "trials_3" / "best_params.json"
             self.assertTrue(best_path.exists())
 
             # Check contents
@@ -200,17 +240,17 @@ class TestBestParamsSaved(unittest.TestCase):
             self.assertEqual(len(saved["trials"]), 3)
 
     def test_skips_existing_study(self):
-        """If best_params.json exists, study is skipped (no optuna needed)."""
+        """If trials_{n}/best_params.json exists, study is skipped."""
         from lg_cotrain.optuna_per_experiment import run_single_study
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Pre-create best_params.json
-            out_dir = Path(tmpdir) / "test_event" / "5_set1"
+            # Pre-create trials_15/best_params.json
+            out_dir = Path(tmpdir) / "test_event" / "5_set1" / "trials_15"
             out_dir.mkdir(parents=True)
             existing = {
                 "event": "test_event", "budget": 5, "seed_set": 1,
                 "status": "done", "best_params": {"lr": 0.001},
-                "best_value": 0.85, "n_trials": 10, "trials": [],
+                "best_value": 0.85, "n_trials": 15, "trials": [],
             }
             (out_dir / "best_params.json").write_text(json.dumps(existing))
 
@@ -221,6 +261,257 @@ class TestBestParamsSaved(unittest.TestCase):
 
             # Should return existing data
             self.assertEqual(result["best_value"], 0.85)
+
+
+class TestFindLatestTrials(unittest.TestCase):
+    """Verify _find_latest_trials finds the highest trial-count folder."""
+
+    def test_finds_highest(self):
+        from lg_cotrain.optuna_per_experiment import _find_latest_trials
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+
+            for n in [5, 10, 20]:
+                d = experiment_dir / f"trials_{n}"
+                d.mkdir(parents=True)
+                data = {
+                    "event": "test_event", "budget": 5, "seed_set": 1,
+                    "status": "done", "best_params": {"lr": 0.001},
+                    "best_value": 0.80 + n * 0.001, "n_trials": n,
+                    "trials": [_make_trial_info(i) for i in range(n)],
+                }
+                (d / "best_params.json").write_text(json.dumps(data))
+
+            result = _find_latest_trials(experiment_dir)
+            self.assertIsNotNone(result)
+            n, data = result
+            self.assertEqual(n, 20)
+            self.assertEqual(data["n_trials"], 20)
+
+    def test_empty_dir(self):
+        from lg_cotrain.optuna_per_experiment import _find_latest_trials
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+            experiment_dir.mkdir(parents=True)
+
+            result = _find_latest_trials(experiment_dir)
+            self.assertIsNone(result)
+
+    def test_nonexistent_dir(self):
+        from lg_cotrain.optuna_per_experiment import _find_latest_trials
+
+        result = _find_latest_trials(Path("/nonexistent/path"))
+        self.assertIsNone(result)
+
+    def test_ignores_non_trial_dirs(self):
+        """Folders not matching trials_* pattern are ignored."""
+        from lg_cotrain.optuna_per_experiment import _find_latest_trials
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+
+            # Create a non-matching directory
+            other = experiment_dir / "some_other_folder"
+            other.mkdir(parents=True)
+            (other / "best_params.json").write_text("{}")
+
+            # Create one matching
+            d = experiment_dir / "trials_5"
+            d.mkdir(parents=True)
+            data = {
+                "event": "test_event", "budget": 5, "seed_set": 1,
+                "status": "done", "best_params": {"lr": 0.001},
+                "best_value": 0.80, "n_trials": 5,
+                "trials": [_make_trial_info(i) for i in range(5)],
+            }
+            (d / "best_params.json").write_text(json.dumps(data))
+
+            result = _find_latest_trials(experiment_dir)
+            self.assertIsNotNone(result)
+            n, _ = result
+            self.assertEqual(n, 5)
+
+
+class TestIncrementalTrials(unittest.TestCase):
+    """Verify incremental trial support."""
+
+    def test_continues_from_previous(self):
+        """Run 20 trials when 10 already exist → only 10 new trials run."""
+        try:
+            import optuna
+        except ImportError:
+            self.skipTest("optuna not installed")
+
+        from lg_cotrain.optuna_per_experiment import run_single_study
+
+        mock_trainer = MagicMock()
+        new_call_count = [0]
+
+        def fake_run():
+            new_call_count[0] += 1
+            return _make_result(dev_macro_f1=0.80 + new_call_count[0] * 0.005)
+
+        mock_trainer.return_value.run = fake_run
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Pre-create trials_10 with 10 trial records
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+            d = experiment_dir / "trials_10"
+            d.mkdir(parents=True)
+            prev_trials = [_make_trial_info(i, dev_f1=0.70 + i * 0.01) for i in range(10)]
+            prev_data = {
+                "event": "test_event", "budget": 5, "seed_set": 1,
+                "status": "done", "best_params": {"lr": 0.001},
+                "best_value": 0.79, "n_trials": 10,
+                "trials": prev_trials,
+            }
+            (d / "best_params.json").write_text(json.dumps(prev_data))
+
+            # Now run with n_trials=20
+            result = run_single_study(
+                event="test_event", budget=5, seed_set=1,
+                n_trials=20, storage_dir=tmpdir,
+                _trainer_cls=mock_trainer,
+            )
+
+            # Only 10 new trials should have run
+            self.assertEqual(new_call_count[0], 10)
+
+            # Result should have all 20 trials
+            self.assertEqual(result["n_trials"], 20)
+            self.assertEqual(len(result["trials"]), 20)
+            self.assertEqual(result["status"], "done")
+            self.assertEqual(result["continued_from"], 10)
+
+            # File should be saved under trials_20/
+            trials_20_path = experiment_dir / "trials_20" / "best_params.json"
+            self.assertTrue(trials_20_path.exists())
+
+    def test_skips_exact_match(self):
+        """If trials_{n} already exists, skip (no optuna needed)."""
+        from lg_cotrain.optuna_per_experiment import run_single_study
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Pre-create trials_15
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+            d = experiment_dir / "trials_15"
+            d.mkdir(parents=True)
+            existing = {
+                "event": "test_event", "budget": 5, "seed_set": 1,
+                "status": "done", "best_params": {"lr": 0.001},
+                "best_value": 0.85, "n_trials": 15, "trials": [],
+            }
+            (d / "best_params.json").write_text(json.dumps(existing))
+
+            result = run_single_study(
+                event="test_event", budget=5, seed_set=1,
+                n_trials=15, storage_dir=tmpdir,
+            )
+
+            self.assertEqual(result["best_value"], 0.85)
+
+    def test_no_previous_runs_all(self):
+        """With no previous trials, all n_trials run from scratch."""
+        try:
+            import optuna
+        except ImportError:
+            self.skipTest("optuna not installed")
+
+        from lg_cotrain.optuna_per_experiment import run_single_study
+
+        mock_trainer = MagicMock()
+        call_count = [0]
+
+        def fake_run():
+            call_count[0] += 1
+            return _make_result(dev_macro_f1=0.70 + call_count[0] * 0.01)
+
+        mock_trainer.return_value.run = fake_run
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_single_study(
+                event="test_event", budget=5, seed_set=1,
+                n_trials=5, storage_dir=tmpdir,
+                _trainer_cls=mock_trainer,
+            )
+
+            self.assertEqual(call_count[0], 5)
+            self.assertEqual(result["n_trials"], 5)
+            self.assertIsNone(result["continued_from"])
+
+    def test_returns_previous_when_enough_trials(self):
+        """If previous trials >= n_trials, return previous results."""
+        try:
+            import optuna
+        except ImportError:
+            self.skipTest("optuna not installed")
+
+        from lg_cotrain.optuna_per_experiment import run_single_study
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create trials_20 (more than we'll request)
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+            d = experiment_dir / "trials_20"
+            d.mkdir(parents=True)
+            prev_data = {
+                "event": "test_event", "budget": 5, "seed_set": 1,
+                "status": "done", "best_params": {"lr": 0.0005},
+                "best_value": 0.90, "n_trials": 20,
+                "trials": [_make_trial_info(i) for i in range(20)],
+            }
+            (d / "best_params.json").write_text(json.dumps(prev_data))
+
+            # Request only 15 — should return the 20-trial results
+            result = run_single_study(
+                event="test_event", budget=5, seed_set=1,
+                n_trials=15, storage_dir=tmpdir,
+            )
+
+            self.assertEqual(result["best_value"], 0.90)
+            self.assertEqual(result["n_trials"], 20)
+
+
+class TestReplayTrials(unittest.TestCase):
+    """Verify _replay_trials_into_study adds trials correctly."""
+
+    def test_replays_correct_count(self):
+        try:
+            import optuna
+        except ImportError:
+            self.skipTest("optuna not installed")
+
+        from lg_cotrain.optuna_per_experiment import _replay_trials_into_study
+
+        study = optuna.create_study(direction="maximize")
+        trials_info = [_make_trial_info(i, dev_f1=0.70 + i * 0.01) for i in range(5)]
+
+        _replay_trials_into_study(study, trials_info)
+
+        self.assertEqual(len(study.trials), 5)
+        # Best value should be the highest
+        self.assertAlmostEqual(study.best_value, 0.74, places=2)
+
+    def test_skips_non_complete_trials(self):
+        try:
+            import optuna
+        except ImportError:
+            self.skipTest("optuna not installed")
+
+        from lg_cotrain.optuna_per_experiment import _replay_trials_into_study
+
+        study = optuna.create_study(direction="maximize")
+        trials_info = [
+            _make_trial_info(0, dev_f1=0.80),
+            {"number": 1, "state": "FAIL", "params": {}, "dev_macro_f1": 0.0},
+            _make_trial_info(2, dev_f1=0.85),
+        ]
+
+        _replay_trials_into_study(study, trials_info)
+
+        # Only 2 COMPLETE trials should be added
+        self.assertEqual(len(study.trials), 2)
 
 
 class TestStudyWorkerPicklable(unittest.TestCase):
@@ -265,15 +556,15 @@ class TestGPUAssignmentForStudies(unittest.TestCase):
 
 
 class TestAllStudiesSkipsCompleted(unittest.TestCase):
-    """Verify run_all_studies skips experiments with existing best_params.json."""
+    """Verify run_all_studies skips experiments with existing results."""
 
     def test_all_skipped_no_worker_call(self):
         from lg_cotrain.optuna_per_experiment import run_all_studies
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Pre-create all results for a small grid
+            # Pre-create all results for a small grid under trials_10/
             for seed_set in [1, 2]:
-                out_dir = Path(tmpdir) / "test_event" / f"5_set{seed_set}"
+                out_dir = Path(tmpdir) / "test_event" / f"5_set{seed_set}" / "trials_10"
                 out_dir.mkdir(parents=True)
                 result = {
                     "event": "test_event", "budget": 5, "seed_set": seed_set,
@@ -300,8 +591,8 @@ class TestAllStudiesSkipsCompleted(unittest.TestCase):
         from lg_cotrain.optuna_per_experiment import run_all_studies
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Pre-create seed_set=1 only
-            out_dir = Path(tmpdir) / "test_event" / "5_set1"
+            # Pre-create seed_set=1 only under trials_10/
+            out_dir = Path(tmpdir) / "test_event" / "5_set1" / "trials_10"
             out_dir.mkdir(parents=True)
             existing = {
                 "event": "test_event", "budget": 5, "seed_set": 1,
@@ -334,13 +625,13 @@ class TestAllStudiesSkipsCompleted(unittest.TestCase):
             self.assertEqual(results[1]["best_value"], 0.82)  # ran
 
     def test_summary_json_written(self):
-        """summary.json should be written after all studies complete."""
+        """summary_{n}.json should be written after all studies complete."""
         from lg_cotrain.optuna_per_experiment import run_all_studies
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Pre-create all results
             for seed_set in [1, 2]:
-                out_dir = Path(tmpdir) / "test_event" / f"5_set{seed_set}"
+                out_dir = Path(tmpdir) / "test_event" / f"5_set{seed_set}" / "trials_10"
                 out_dir.mkdir(parents=True)
                 result = {
                     "event": "test_event", "budget": 5, "seed_set": seed_set,
@@ -357,7 +648,7 @@ class TestAllStudiesSkipsCompleted(unittest.TestCase):
                 storage_dir=tmpdir,
             )
 
-            summary_path = Path(tmpdir) / "summary.json"
+            summary_path = Path(tmpdir) / "summary_10.json"
             self.assertTrue(summary_path.exists())
 
             with open(summary_path) as f:
@@ -365,6 +656,7 @@ class TestAllStudiesSkipsCompleted(unittest.TestCase):
 
             self.assertEqual(summary["total_studies"], 2)
             self.assertEqual(len(summary["studies"]), 2)
+            self.assertEqual(summary["n_trials_per_study"], 10)
 
 
 class TestLoadBestParams(unittest.TestCase):
@@ -374,9 +666,9 @@ class TestLoadBestParams(unittest.TestCase):
         from lg_cotrain.optuna_per_experiment import load_best_params
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create 2 best_params.json files
+            # Create 2 best_params.json files under trials_10/
             for seed_set in [1, 2]:
-                out_dir = Path(tmpdir) / "test_event" / f"5_set{seed_set}"
+                out_dir = Path(tmpdir) / "test_event" / f"5_set{seed_set}" / "trials_10"
                 out_dir.mkdir(parents=True)
                 data = {
                     "event": "test_event", "budget": 5, "seed_set": seed_set,
@@ -391,6 +683,7 @@ class TestLoadBestParams(unittest.TestCase):
                 events=["test_event"],
                 budgets=[5],
                 seed_sets=[1, 2],
+                n_trials=10,
             )
 
             self.assertEqual(len(results), 2)
@@ -405,7 +698,7 @@ class TestLoadBestParams(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Only create seed_set=1
-            out_dir = Path(tmpdir) / "test_event" / "5_set1"
+            out_dir = Path(tmpdir) / "test_event" / "5_set1" / "trials_10"
             out_dir.mkdir(parents=True)
             data = {
                 "event": "test_event", "budget": 5, "seed_set": 1,
@@ -419,11 +712,77 @@ class TestLoadBestParams(unittest.TestCase):
                 events=["test_event"],
                 budgets=[5],
                 seed_sets=[1, 2, 3],
+                n_trials=10,
             )
 
             self.assertEqual(len(results), 1)
             self.assertIn(("test_event", 5, 1), results)
             self.assertNotIn(("test_event", 5, 2), results)
+
+
+class TestLoadBestParamsWithTrials(unittest.TestCase):
+    """Verify load_best_params with n_trials parameter."""
+
+    def test_loads_specific_n_trials(self):
+        """load_best_params(n_trials=10) loads from trials_10/."""
+        from lg_cotrain.optuna_per_experiment import load_best_params
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+
+            # Create trials_10 and trials_20
+            for n in [10, 20]:
+                d = experiment_dir / f"trials_{n}"
+                d.mkdir(parents=True)
+                data = {
+                    "event": "test_event", "budget": 5, "seed_set": 1,
+                    "status": "done", "best_params": {"lr": 0.001 if n == 10 else 0.0005},
+                    "best_value": 0.80 if n == 10 else 0.85,
+                    "n_trials": n, "trials": [],
+                }
+                (d / "best_params.json").write_text(json.dumps(data))
+
+            results = load_best_params(
+                storage_dir=tmpdir,
+                events=["test_event"],
+                budgets=[5],
+                seed_sets=[1],
+                n_trials=10,
+            )
+
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[("test_event", 5, 1)]["best_value"], 0.80)
+            self.assertEqual(results[("test_event", 5, 1)]["n_trials"], 10)
+
+    def test_loads_latest_by_default(self):
+        """load_best_params() without n_trials loads the latest."""
+        from lg_cotrain.optuna_per_experiment import load_best_params
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            experiment_dir = Path(tmpdir) / "test_event" / "5_set1"
+
+            for n in [10, 20]:
+                d = experiment_dir / f"trials_{n}"
+                d.mkdir(parents=True)
+                data = {
+                    "event": "test_event", "budget": 5, "seed_set": 1,
+                    "status": "done", "best_params": {"lr": 0.001 if n == 10 else 0.0005},
+                    "best_value": 0.80 if n == 10 else 0.85,
+                    "n_trials": n, "trials": [],
+                }
+                (d / "best_params.json").write_text(json.dumps(data))
+
+            results = load_best_params(
+                storage_dir=tmpdir,
+                events=["test_event"],
+                budgets=[5],
+                seed_sets=[1],
+            )
+
+            self.assertEqual(len(results), 1)
+            # Should load from trials_20 (latest)
+            self.assertEqual(results[("test_event", 5, 1)]["best_value"], 0.85)
+            self.assertEqual(results[("test_event", 5, 1)]["n_trials"], 20)
 
 
 class TestCLIFlags(unittest.TestCase):
