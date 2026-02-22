@@ -133,17 +133,19 @@ The pipeline has three phases, each building on the previous one. Two BERT model
 
 **Goal**: Learn how much each pseudo-label can be trusted.
 
-Two fresh BERT models are trained **separately** — Model 1 on D_l1, Model 2 on D_l2 (stratified halves of the small labeled set). After each training epoch, both models predict softmax probabilities for every sample in the pseudo-labeled set (D_LG). These predictions are recorded by a `WeightTracker`.
+Two fresh BERT models are trained **separately** — Model 1 on D_l1, Model 2 on D_l2 (stratified halves of the small labeled set). After training completes, each model predicts softmax probabilities for every sample in the pseudo-labeled set (D_LG) using only the **final epoch's** weights. These final-epoch probabilities are then used to seed Phase 2's `WeightTracker` (via `seed_from_last_epoch()`), matching Algorithm 1 in the paper.
 
-After all epochs, lambda weights are computed per sample:
+Since Phase 2 starts with only one epoch of observations, the initial lambda weights are:
 
 ```
-confidence  = mean of p(pseudo_label | x; theta) across all epochs
-variability = std  of p(pseudo_label | x; theta) across all epochs
+confidence  = p(pseudo_label | x; theta) from the final Phase 1 epoch
+variability = 0  (only one observation)
 
-lambda_optimistic (lambda1)    = confidence + variability
-lambda_conservative (lambda2)  = max(confidence - variability, 0)
+lambda_optimistic (lambda1)    = confidence + 0 = confidence
+lambda_conservative (lambda2)  = max(confidence - 0, 0) = confidence
 ```
+
+As Phase 2 training proceeds and new probability observations accumulate each epoch, confidence and variability are recomputed as the mean and std across all recorded Phase 2 epochs, causing the optimistic and conservative weights to diverge.
 
 **Intuition**:
 
@@ -171,10 +173,10 @@ lambda_conservative (lambda2)  = max(confidence - variability, 0)
 
 Two **new** BERT models are initialized fresh. They train on D_LG using **weighted cross-entropy loss**, where each sample's loss contribution is scaled by its lambda weight:
 
-- **Model 1**'s loss is weighted by **lambda2** (conservative weights derived from Model 2's Phase 1 tracker)
-- **Model 2**'s loss is weighted by **lambda1** (optimistic weights derived from Model 1's Phase 1 tracker)
+- **Model 1**'s loss is weighted by **lambda2** (conservative weights seeded from Model 2's final Phase 1 epoch)
+- **Model 2**'s loss is weighted by **lambda1** (optimistic weights seeded from Model 1's final Phase 1 epoch)
 
-This cross-weighting is the core of co-training — each model guides the other by sharing its perspective on pseudo-label quality. The weights are also updated each epoch as new probability observations accumulate.
+This cross-weighting is the core of co-training — each model guides the other by sharing its perspective on pseudo-label quality. Each Phase 2 epoch, both models re-evaluate D_LG and the new probability observations are added to the tracker, so confidence and variability (and thus lambda weights) are recomputed with increasing history.
 
 ```
     Cross-Weight Exchange in Co-Training
@@ -436,6 +438,30 @@ python check_progress.py --results-dir /path/to/results
 
 The script scans `study.log` files across all 120 studies and reports: completed/running/pending studies, total trial progress with a progress bar, average trial duration, estimated time remaining (accounting for GPU parallelism), and per-study detail showing current phase and epoch. It is read-only and does not modify any files.
 
+#### Multi-PC workflow
+
+To speed up tuning, split events across multiple PCs. On each PC, set `EVENTS` in notebook cell 3 to a subset (e.g., PC 1 runs 4 events, PC 2 runs 3, PC 3 runs 3). After all PCs finish, copy the result folders together and regenerate the summary:
+
+```bash
+# Regenerate summary from whatever exists (after manually copying folders)
+python merge_optuna_results.py --target results/optuna/per_experiment --n-trials 10
+
+# Or merge from other PCs and regenerate in one step
+python merge_optuna_results.py \
+    --sources pc2_results/optuna/per_experiment \
+              pc3_results/optuna/per_experiment \
+    --target results/optuna/per_experiment \
+    --n-trials 10
+
+# Preview what would be copied (no actual changes)
+python merge_optuna_results.py \
+    --sources pc2_results/optuna/per_experiment \
+    --target results/optuna/per_experiment \
+    --n-trials 10 --dry-run
+```
+
+The script reports completed, missing, and failed studies, and writes `summary_{n}.json` compatible with notebook cell 7.
+
 ### All CLI Options
 
 | Option                  | Description                         | Default                         |
@@ -608,6 +634,7 @@ Notebooks/
 └── 07_optuna_per_experiment.ipynb               # Per-experiment Optuna tuning (120 studies, multi-GPU)
 
 check_progress.py                    # Standalone Optuna progress checker (study.log scanner with ETA)
+merge_optuna_results.py              # Standalone Optuna results merger and summary generator
 
 tests/                               # 400+ tests across 16 test files
 ├── conftest.py                      # Shared pytest fixtures
