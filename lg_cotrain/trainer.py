@@ -226,15 +226,15 @@ class LGCoTrainer:
         cotrain_tracker1 = WeightTracker.seed_from_last_epoch(tracker1)
         cotrain_tracker2 = WeightTracker.seed_from_last_epoch(tracker2)
 
-        # Initial lambdas from seeded trackers (1 epoch → variability=0, lambda1=lambda2=confidence)
+        # Initial lambdas from seeded trackers (1 epoch -> variability=0, lambda1=lambda2=confidence)
         lambda1 = cotrain_tracker1.compute_lambda_optimistic()
         lambda2 = cotrain_tracker2.compute_lambda_conservative()
         logger.info(
-            f"Phase 1 done → seeded Phase 2 trackers. "
+            f"Phase 1 done -> seeded Phase 2 trackers. "
             f"lambda1: mean={lambda1.mean():.4f}, range=[{lambda1.min():.4f}, {lambda1.max():.4f}]"
         )
         logger.info(
-            f"Phase 1 done → seeded Phase 2 trackers. "
+            f"Phase 1 done -> seeded Phase 2 trackers. "
             f"lambda2: mean={lambda2.mean():.4f}, range=[{lambda2.min():.4f}, {lambda2.max():.4f}]"
         )
 
