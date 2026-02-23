@@ -47,8 +47,8 @@ class TestWeightTrackerEvaluateIntegration(unittest.TestCase):
             self.assertGreaterEqual(l1, 0.0)
             self.assertGreaterEqual(l2_val, 0.0)
 
-    def test_cotrain_phase_lambda_seeding_preserves_history(self):
-        """Simulate Phase 2: seed from Phase 1 full history, verify asymmetric lambdas."""
+    def test_cotrain_phase_lambda_seeding_last_epoch_only(self):
+        """Simulate Phase 1→2: seed from last epoch only, verify initial lambdas."""
         num_samples = 10
 
         # Phase 1: record 3 epochs with varying probabilities
@@ -56,34 +56,38 @@ class TestWeightTrackerEvaluateIntegration(unittest.TestCase):
         for val in [0.3, 0.5, 0.7]:
             p1_tracker.record_epoch([val] * num_samples)
 
-        # Seed Phase 2 with full Phase 1 history
-        p2_tracker = WeightTracker.seed_from_tracker(p1_tracker)
+        # Seed Phase 2 with only the last Phase 1 epoch (per Algorithm 1)
+        p2_tracker = WeightTracker.seed_from_last_epoch(p1_tracker)
 
-        # Phase 2 tracker should have all 3 epochs
-        self.assertEqual(p2_tracker.num_epochs_recorded, 3)
+        # Phase 2 tracker should have exactly 1 epoch
+        self.assertEqual(p2_tracker.num_epochs_recorded, 1)
 
-        # Variability should be > 0 (not lost as in the old buggy code)
+        # Variability should be 0 (only one observation)
+        var = p2_tracker.compute_variability()
+        for v in var:
+            self.assertAlmostEqual(v, 0.0)
+
+        # With variability=0: lambda1 = lambda2 = confidence = last epoch probs
+        lam1 = p2_tracker.compute_lambda_optimistic()
+        lam2 = p2_tracker.compute_lambda_conservative()
+        for a, b in zip(lam1, lam2):
+            self.assertAlmostEqual(a, b)
+        for a in lam1:
+            self.assertAlmostEqual(a, 0.7)  # last epoch value
+
+        # After recording a Phase 2 epoch, history grows to 2
+        p2_tracker.record_epoch([0.8] * num_samples)
+        self.assertEqual(p2_tracker.num_epochs_recorded, 2)
+
+        # Now variability > 0 and lambdas diverge
         var = p2_tracker.compute_variability()
         for v in var:
             self.assertGreater(v, 0.0)
-
-        # Lambda1 (optimistic) should be > Lambda2 (conservative)
         lam1 = p2_tracker.compute_lambda_optimistic()
         lam2 = p2_tracker.compute_lambda_conservative()
         for a, b in zip(lam1, lam2):
             self.assertGreater(a, b)
 
-        # Values should match the original Phase 1 tracker
-        orig_lam1 = p1_tracker.compute_lambda_optimistic()
-        orig_lam2 = p1_tracker.compute_lambda_conservative()
-        for a, b in zip(lam1, orig_lam1):
-            self.assertAlmostEqual(a, b)
-        for a, b in zip(lam2, orig_lam2):
-            self.assertAlmostEqual(a, b)
-
-        # After recording a Phase 2 epoch, history grows
-        p2_tracker.record_epoch([0.8] * num_samples)
-        self.assertEqual(p2_tracker.num_epochs_recorded, 4)
         # Source is not affected
         self.assertEqual(p1_tracker.num_epochs_recorded, 3)
 
