@@ -10,6 +10,7 @@ Usage:
     python check_progress.py --watch          # refresh every 30s
     python check_progress.py --watch --interval 10
     python check_progress.py --num-gpus 2     # override GPU count for ETA
+    python check_progress.py --num-events 2   # running on 2 events (2x4x3=24 studies)
 """
 
 import argparse
@@ -20,9 +21,6 @@ import subprocess
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-
-# Expected total: 10 events × 4 budgets × 3 seeds = 120 studies
-TOTAL_STUDIES = 120
 
 # Display width — adapts to terminal, minimum 90 for readability
 WIDTH = max(shutil.get_terminal_size((100, 24)).columns, 90)
@@ -186,7 +184,9 @@ def find_study_logs(results_dir: str) -> list:
     return logs
 
 
-def print_progress(results_dir: str, num_gpus_override: int = None):
+def print_progress(results_dir: str, num_gpus_override: int = None,
+                    num_events: int = 10, num_budgets: int = 4,
+                    num_seeds: int = 3):
     """Parse all study logs and print a progress report."""
     logs = find_study_logs(results_dir)
     w = WIDTH
@@ -210,9 +210,10 @@ def print_progress(results_dir: str, num_gpus_override: int = None):
         all_durations.extend(s["trial_durations"])
 
     # Compute target trials per study (assume uniform)
+    total_studies = num_events * num_budgets * num_seeds
     trials_per_study = studies[0]["target_trials"] if studies else 10
-    total_expected_trials = TOTAL_STUDIES * trials_per_study
-    not_started = TOTAL_STUDIES - len(studies)
+    total_expected_trials = total_studies * trials_per_study
+    not_started = total_studies - len(studies)
 
     # GPU info
     gpus = detect_gpu_info()
@@ -236,7 +237,7 @@ def print_progress(results_dir: str, num_gpus_override: int = None):
 
     # Overall summary
     print(f"\n  Studies:  {len(completed)} done, {len(in_progress)} running, "
-          f"{len(failed)} failed, {not_started} not started  (of {TOTAL_STUDIES})")
+          f"{len(failed)} failed, {not_started} not started  (of {total_studies})")
     print(f"  Trials:   {total_trials_done} / {total_expected_trials} completed")
 
     if total_expected_trials > 0:
@@ -345,19 +346,39 @@ def main():
         default=None,
         help="Override GPU count for ETA calculation (default: auto-detect via nvidia-smi)",
     )
+    parser.add_argument(
+        "--num-events",
+        type=int,
+        default=10,
+        help="Number of disaster events being tuned (default: 10)",
+    )
+    parser.add_argument(
+        "--num-budgets",
+        type=int,
+        default=4,
+        help="Number of budget levels being tuned (default: 4)",
+    )
+    parser.add_argument(
+        "--num-seeds",
+        type=int,
+        default=3,
+        help="Number of seed sets being tuned (default: 3)",
+    )
     args = parser.parse_args()
 
     if args.watch:
         try:
             while True:
                 os.system("cls" if os.name == "nt" else "clear")
-                print_progress(args.results_dir, args.num_gpus)
+                print_progress(args.results_dir, args.num_gpus,
+                               args.num_events, args.num_budgets, args.num_seeds)
                 print(f"  (refreshing every {args.interval}s — Ctrl+C to stop)")
                 time.sleep(args.interval)
         except KeyboardInterrupt:
             print("\nStopped.")
     else:
-        print_progress(args.results_dir, args.num_gpus)
+        print_progress(args.results_dir, args.num_gpus,
+                       args.num_events, args.num_budgets, args.num_seeds)
 
 
 if __name__ == "__main__":
