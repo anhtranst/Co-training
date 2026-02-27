@@ -1,0 +1,1180 @@
+[
+  {
+    "event": "california_wildfires_2018",
+    "budget": 10,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 0.00016087489769288458,
+      "batch_size": 32,
+      "cotrain_epochs": 15,
+      "finetune_patience": 9,
+      "weight_decay": 0.014173351197259154,
+      "warmup_ratio": 0.1847534843660598
+    },
+    "dev_macro_f1": 0.627186,
+    "test_error_rate": 31.14,
+    "test_macro_f1": 0.5982,
+    "test_ece": 0.0862
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 10,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 8,
+    "best_params": {
+      "lr": 2.5075300244682265e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 11,
+      "finetune_patience": 9,
+      "weight_decay": 0.0041374274059004625,
+      "warmup_ratio": 0.08917990238288648
+    },
+    "dev_macro_f1": 0.649218,
+    "test_error_rate": 26.97,
+    "test_macro_f1": 0.656,
+    "test_ece": 0.1266
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 10,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 7.881352829491434e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 7,
+      "finetune_patience": 4,
+      "weight_decay": 0.07303498787260168,
+      "warmup_ratio": 0.26603069666185836
+    },
+    "dev_macro_f1": 0.641599,
+    "test_error_rate": 29.09,
+    "test_macro_f1": 0.6376,
+    "test_ece": 0.1073
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 25,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 4,
+    "best_params": {
+      "lr": 2.49410222032117e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 5,
+      "finetune_patience": 5,
+      "weight_decay": 0.03534699864528932,
+      "warmup_ratio": 0.21218683735749722
+    },
+    "dev_macro_f1": 0.630215,
+    "test_error_rate": 28.54,
+    "test_macro_f1": 0.6229,
+    "test_ece": 0.0398
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 25,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 7.235758497640272e-05,
+      "batch_size": 64,
+      "cotrain_epochs": 9,
+      "finetune_patience": 10,
+      "weight_decay": 0.03035058000558959,
+      "warmup_ratio": 0.057367984994053475
+    },
+    "dev_macro_f1": 0.668912,
+    "test_error_rate": 29.09,
+    "test_macro_f1": 0.6488,
+    "test_ece": 0.1107
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 25,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 7.974143120144007e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 12,
+      "finetune_patience": 4,
+      "weight_decay": 0.030387934388636274,
+      "warmup_ratio": 0.2110244029248216
+    },
+    "dev_macro_f1": 0.639295,
+    "test_error_rate": 27.93,
+    "test_macro_f1": 0.6418,
+    "test_ece": 0.0599
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 50,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 3.211222591920062e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 17,
+      "finetune_patience": 6,
+      "weight_decay": 0.05812907746724682,
+      "warmup_ratio": 0.04516032654255475
+    },
+    "dev_macro_f1": 0.649113,
+    "test_error_rate": 27.45,
+    "test_macro_f1": 0.6598,
+    "test_ece": 0.131
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 50,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 6,
+    "best_params": {
+      "lr": 5.8141404616733054e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 8,
+      "finetune_patience": 9,
+      "weight_decay": 0.0255711742456214,
+      "warmup_ratio": 0.058774894588774704
+    },
+    "dev_macro_f1": 0.66102,
+    "test_error_rate": 26.97,
+    "test_macro_f1": 0.6617,
+    "test_ece": 0.0996
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 50,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 6.540541729115279e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 6,
+      "finetune_patience": 6,
+      "weight_decay": 0.06501599040055,
+      "warmup_ratio": 0.1425691554084854
+    },
+    "dev_macro_f1": 0.651661,
+    "test_error_rate": 27.38,
+    "test_macro_f1": 0.663,
+    "test_ece": 0.0475
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 5,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 0.00014751942279771948,
+      "batch_size": 16,
+      "cotrain_epochs": 17,
+      "finetune_patience": 6,
+      "weight_decay": 0.09788710035884163,
+      "warmup_ratio": 0.15070733655592253
+    },
+    "dev_macro_f1": 0.630629,
+    "test_error_rate": 29.16,
+    "test_macro_f1": 0.6079,
+    "test_ece": 0.1533
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 5,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 5,
+    "best_params": {
+      "lr": 0.00014045420604759357,
+      "batch_size": 32,
+      "cotrain_epochs": 20,
+      "finetune_patience": 10,
+      "weight_decay": 0.09931941692821025,
+      "warmup_ratio": 0.13547364571858428
+    },
+    "dev_macro_f1": 0.628636,
+    "test_error_rate": 27.52,
+    "test_macro_f1": 0.6014,
+    "test_ece": 0.1896
+  },
+  {
+    "event": "california_wildfires_2018",
+    "budget": 5,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 3.435428009164826e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 6,
+      "finetune_patience": 6,
+      "weight_decay": 0.02897182193322132,
+      "warmup_ratio": 0.101024020744249
+    },
+    "dev_macro_f1": 0.631253,
+    "test_error_rate": 27.99,
+    "test_macro_f1": 0.6242,
+    "test_ece": 0.1788
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 10,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 8.239812945126067e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 19,
+      "finetune_patience": 10,
+      "weight_decay": 0.007770719677067828,
+      "warmup_ratio": 0.05734310047335886
+    },
+    "dev_macro_f1": 0.654391,
+    "test_error_rate": 24.27,
+    "test_macro_f1": 0.6003,
+    "test_ece": 0.1047
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 10,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 4,
+    "best_params": {
+      "lr": 4.608915779652734e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 10,
+      "finetune_patience": 7,
+      "weight_decay": 0.027333102269306887,
+      "warmup_ratio": 0.10326043713370958
+    },
+    "dev_macro_f1": 0.694568,
+    "test_error_rate": 23.82,
+    "test_macro_f1": 0.589,
+    "test_ece": 0.0808
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 10,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 1.241054520195743e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 5,
+      "finetune_patience": 6,
+      "weight_decay": 0.03599269849433819,
+      "warmup_ratio": 0.1066183902503916
+    },
+    "dev_macro_f1": 0.698086,
+    "test_error_rate": 22.7,
+    "test_macro_f1": 0.5976,
+    "test_ece": 0.1347
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 25,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 2.6504272649245174e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 8,
+      "finetune_patience": 10,
+      "weight_decay": 0.049486001722645126,
+      "warmup_ratio": 0.14147650014732224
+    },
+    "dev_macro_f1": 0.712115,
+    "test_error_rate": 22.7,
+    "test_macro_f1": 0.6182,
+    "test_ece": 0.0529
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 25,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 7.49001471627144e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 7,
+      "finetune_patience": 8,
+      "weight_decay": 0.08186706996609883,
+      "warmup_ratio": 0.23888004203920454
+    },
+    "dev_macro_f1": 0.681968,
+    "test_error_rate": 27.64,
+    "test_macro_f1": 0.5654,
+    "test_ece": 0.1105
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 25,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 5,
+    "best_params": {
+      "lr": 1.6413243523500512e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 13,
+      "finetune_patience": 5,
+      "weight_decay": 0.014080592149637895,
+      "warmup_ratio": 0.0997869103776692
+    },
+    "dev_macro_f1": 0.755307,
+    "test_error_rate": 24.49,
+    "test_macro_f1": 0.605,
+    "test_ece": 0.0984
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 50,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 1,
+    "best_params": {
+      "lr": 1.3936313502439895e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 17,
+      "finetune_patience": 9,
+      "weight_decay": 0.08393471516148564,
+      "warmup_ratio": 0.22430653739627276
+    },
+    "dev_macro_f1": 0.722241,
+    "test_error_rate": 22.92,
+    "test_macro_f1": 0.5974,
+    "test_ece": 0.1209
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 50,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 5.09558671143145e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 12,
+      "finetune_patience": 9,
+      "weight_decay": 0.07636043969688029,
+      "warmup_ratio": 0.1540192673643603
+    },
+    "dev_macro_f1": 0.704674,
+    "test_error_rate": 26.29,
+    "test_macro_f1": 0.5919,
+    "test_ece": 0.1021
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 50,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 4.4203401535294845e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 15,
+      "finetune_patience": 7,
+      "weight_decay": 0.0977582625176163,
+      "warmup_ratio": 0.003182528812138141
+    },
+    "dev_macro_f1": 0.744694,
+    "test_error_rate": 24.72,
+    "test_macro_f1": 0.5529,
+    "test_ece": 0.1043
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 5,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 5,
+    "best_params": {
+      "lr": 0.0001721942345683964,
+      "batch_size": 16,
+      "cotrain_epochs": 10,
+      "finetune_patience": 10,
+      "weight_decay": 0.04053842770324332,
+      "warmup_ratio": 0.19050746904625823
+    },
+    "dev_macro_f1": 0.630123,
+    "test_error_rate": 26.52,
+    "test_macro_f1": 0.5756,
+    "test_ece": 0.1389
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 5,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 6,
+    "best_params": {
+      "lr": 1.3491373838363608e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 7,
+      "finetune_patience": 10,
+      "weight_decay": 0.008095695916327972,
+      "warmup_ratio": 0.21093915949485886
+    },
+    "dev_macro_f1": 0.654318,
+    "test_error_rate": 23.82,
+    "test_macro_f1": 0.5484,
+    "test_ece": 0.0791
+  },
+  {
+    "event": "canada_wildfires_2016",
+    "budget": 5,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 0,
+    "best_params": {
+      "lr": 6.423663651264135e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 5,
+      "finetune_patience": 9,
+      "weight_decay": 0.04281254644585544,
+      "warmup_ratio": 0.2533073982807264
+    },
+    "dev_macro_f1": 0.694543,
+    "test_error_rate": 23.82,
+    "test_macro_f1": 0.5728,
+    "test_ece": 0.1015
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 10,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 6.290736099224266e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 18,
+      "finetune_patience": 7,
+      "weight_decay": 0.04967929930771401,
+      "warmup_ratio": 0.03007625388050554
+    },
+    "dev_macro_f1": 0.533099,
+    "test_error_rate": 28.63,
+    "test_macro_f1": 0.5537,
+    "test_ece": 0.1146
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 10,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 0,
+    "best_params": {
+      "lr": 4.6908867921091745e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 12,
+      "finetune_patience": 9,
+      "weight_decay": 0.05599363609141797,
+      "warmup_ratio": 0.09953799745925326
+    },
+    "dev_macro_f1": 0.539312,
+    "test_error_rate": 23.11,
+    "test_macro_f1": 0.6305,
+    "test_ece": 0.0969
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 10,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 3.7002243022809026e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 5,
+      "finetune_patience": 9,
+      "weight_decay": 0.08754848618353415,
+      "warmup_ratio": 0.07204033696047231
+    },
+    "dev_macro_f1": 0.5069,
+    "test_error_rate": 26.44,
+    "test_macro_f1": 0.6173,
+    "test_ece": 0.0566
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 25,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 4.1599948235971906e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 18,
+      "finetune_patience": 5,
+      "weight_decay": 0.06927780913690458,
+      "warmup_ratio": 0.24351329564418786
+    },
+    "dev_macro_f1": 0.535604,
+    "test_error_rate": 30.55,
+    "test_macro_f1": 0.6262,
+    "test_ece": 0.0925
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 25,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 6.82175409280196e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 5,
+      "finetune_patience": 6,
+      "weight_decay": 0.057573239486461425,
+      "warmup_ratio": 0.06587988039387883
+    },
+    "dev_macro_f1": 0.515738,
+    "test_error_rate": 25.93,
+    "test_macro_f1": 0.6106,
+    "test_ece": 0.1092
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 25,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 1,
+    "best_params": {
+      "lr": 2.89599833867194e-05,
+      "batch_size": 64,
+      "cotrain_epochs": 6,
+      "finetune_patience": 9,
+      "weight_decay": 0.061942046616273255,
+      "warmup_ratio": 0.21082118802214744
+    },
+    "dev_macro_f1": 0.493542,
+    "test_error_rate": 25.93,
+    "test_macro_f1": 0.5917,
+    "test_ece": 0.1089
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 50,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 6,
+    "best_params": {
+      "lr": 0.00011643086599876767,
+      "batch_size": 32,
+      "cotrain_epochs": 14,
+      "finetune_patience": 10,
+      "weight_decay": 0.08107621116953784,
+      "warmup_ratio": 0.1589258831482798
+    },
+    "dev_macro_f1": 0.574216,
+    "test_error_rate": 32.86,
+    "test_macro_f1": 0.5822,
+    "test_ece": 0.133
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 50,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 8,
+    "best_params": {
+      "lr": 2.4046855819167734e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 19,
+      "finetune_patience": 9,
+      "weight_decay": 0.05769839524201337,
+      "warmup_ratio": 0.2925749385608005
+    },
+    "dev_macro_f1": 0.526541,
+    "test_error_rate": 25.42,
+    "test_macro_f1": 0.5659,
+    "test_ece": 0.0788
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 50,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 4,
+    "best_params": {
+      "lr": 7.873612085515485e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 9,
+      "finetune_patience": 7,
+      "weight_decay": 0.0724963938112261,
+      "warmup_ratio": 0.12812667094425675
+    },
+    "dev_macro_f1": 0.564668,
+    "test_error_rate": 31.45,
+    "test_macro_f1": 0.6127,
+    "test_ece": 0.1077
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 5,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 3.416887568192935e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 13,
+      "finetune_patience": 10,
+      "weight_decay": 0.036818385504877385,
+      "warmup_ratio": 0.09977191720569374
+    },
+    "dev_macro_f1": 0.575642,
+    "test_error_rate": 25.55,
+    "test_macro_f1": 0.6172,
+    "test_ece": 0.0981
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 5,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 5,
+    "best_params": {
+      "lr": 4.5268890588060405e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 5,
+      "finetune_patience": 5,
+      "weight_decay": 0.011166988078995889,
+      "warmup_ratio": 0.16915623345434003
+    },
+    "dev_macro_f1": 0.580912,
+    "test_error_rate": 25.93,
+    "test_macro_f1": 0.5709,
+    "test_ece": 0.0783
+  },
+  {
+    "event": "cyclone_idai_2019",
+    "budget": 5,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 1,
+    "best_params": {
+      "lr": 2.1198013734059526e-05,
+      "batch_size": 64,
+      "cotrain_epochs": 18,
+      "finetune_patience": 9,
+      "weight_decay": 0.03563780108834096,
+      "warmup_ratio": 0.09295069316630314
+    },
+    "dev_macro_f1": 0.504364,
+    "test_error_rate": 25.55,
+    "test_macro_f1": 0.5358,
+    "test_ece": 0.0836
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 10,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 0,
+    "best_params": {
+      "lr": 0.00013123095308301198,
+      "batch_size": 32,
+      "cotrain_epochs": 13,
+      "finetune_patience": 8,
+      "weight_decay": 0.09226365039101496,
+      "warmup_ratio": 0.08628606674179075
+    },
+    "dev_macro_f1": 0.585918,
+    "test_error_rate": 38.73,
+    "test_macro_f1": 0.5543,
+    "test_ece": 0.1598
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 10,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 6,
+    "best_params": {
+      "lr": 9.650365680109957e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 6,
+      "finetune_patience": 4,
+      "weight_decay": 0.06694649825317295,
+      "warmup_ratio": 0.035137589873009245
+    },
+    "dev_macro_f1": 0.607868,
+    "test_error_rate": 38.26,
+    "test_macro_f1": 0.5838,
+    "test_ece": 0.2301
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 10,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 9.823771420077114e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 18,
+      "finetune_patience": 8,
+      "weight_decay": 0.06073820320736544,
+      "warmup_ratio": 0.17469443596672715
+    },
+    "dev_macro_f1": 0.575563,
+    "test_error_rate": 36.67,
+    "test_macro_f1": 0.5911,
+    "test_ece": 0.2278
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 25,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 0,
+    "best_params": {
+      "lr": 0.00014050536332073417,
+      "batch_size": 16,
+      "cotrain_epochs": 19,
+      "finetune_patience": 4,
+      "weight_decay": 0.02771163799174592,
+      "warmup_ratio": 0.03741296087724259
+    },
+    "dev_macro_f1": 0.615927,
+    "test_error_rate": 36.8,
+    "test_macro_f1": 0.5799,
+    "test_ece": 0.1704
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 25,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 8,
+    "best_params": {
+      "lr": 0.000229219795401078,
+      "batch_size": 64,
+      "cotrain_epochs": 18,
+      "finetune_patience": 5,
+      "weight_decay": 0.0351383193683932,
+      "warmup_ratio": 0.29019797853102064
+    },
+    "dev_macro_f1": 0.598522,
+    "test_error_rate": 35.94,
+    "test_macro_f1": 0.5746,
+    "test_ece": 0.1239
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 25,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 3.093360457429734e-05,
+      "batch_size": 64,
+      "cotrain_epochs": 8,
+      "finetune_patience": 4,
+      "weight_decay": 0.0815483853575753,
+      "warmup_ratio": 0.07434682179116296
+    },
+    "dev_macro_f1": 0.606174,
+    "test_error_rate": 36.27,
+    "test_macro_f1": 0.5759,
+    "test_ece": 0.1081
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 50,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 4.880247632424306e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 11,
+      "finetune_patience": 5,
+      "weight_decay": 0.025433834436270588,
+      "warmup_ratio": 0.27013995014608294
+    },
+    "dev_macro_f1": 0.626896,
+    "test_error_rate": 36.27,
+    "test_macro_f1": 0.582,
+    "test_ece": 0.1794
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 50,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 6.411308514199175e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 5,
+      "finetune_patience": 10,
+      "weight_decay": 0.051634014028824754,
+      "warmup_ratio": 0.010132173866754622
+    },
+    "dev_macro_f1": 0.611137,
+    "test_error_rate": 34.95,
+    "test_macro_f1": 0.6016,
+    "test_ece": 0.1923
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 50,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 4,
+    "best_params": {
+      "lr": 0.00011738665243539033,
+      "batch_size": 32,
+      "cotrain_epochs": 5,
+      "finetune_patience": 8,
+      "weight_decay": 0.08501401595734925,
+      "warmup_ratio": 0.12689728652207075
+    },
+    "dev_macro_f1": 0.623362,
+    "test_error_rate": 34.62,
+    "test_macro_f1": 0.602,
+    "test_ece": 0.0459
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 5,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 8,
+    "best_params": {
+      "lr": 2.6513833414644875e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 9,
+      "finetune_patience": 7,
+      "weight_decay": 0.0433211931775362,
+      "warmup_ratio": 0.2083744286858068
+    },
+    "dev_macro_f1": 0.580101,
+    "test_error_rate": 37.07,
+    "test_macro_f1": 0.5442,
+    "test_ece": 0.2446
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 5,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 9,
+    "best_params": {
+      "lr": 0.00014369465662371044,
+      "batch_size": 16,
+      "cotrain_epochs": 14,
+      "finetune_patience": 8,
+      "weight_decay": 0.06196684750712033,
+      "warmup_ratio": 0.179831757844134
+    },
+    "dev_macro_f1": 0.60355,
+    "test_error_rate": 36.41,
+    "test_macro_f1": 0.5793,
+    "test_ece": 0.1926
+  },
+  {
+    "event": "hurricane_dorian_2019",
+    "budget": 5,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 7.665978287449936e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 17,
+      "finetune_patience": 5,
+      "weight_decay": 0.024463922286643826,
+      "warmup_ratio": 0.16185004742771888
+    },
+    "dev_macro_f1": 0.549016,
+    "test_error_rate": 37.33,
+    "test_macro_f1": 0.5582,
+    "test_ece": 0.2591
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 10,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 4,
+    "best_params": {
+      "lr": 1.5567531116186572e-05,
+      "batch_size": 64,
+      "cotrain_epochs": 15,
+      "finetune_patience": 6,
+      "weight_decay": 0.09042520314152142,
+      "warmup_ratio": 0.05096566439146553
+    },
+    "dev_macro_f1": 0.678816,
+    "test_error_rate": 25.54,
+    "test_macro_f1": 0.6539,
+    "test_ece": 0.1558
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 10,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 3.2612349850132424e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 8,
+      "finetune_patience": 8,
+      "weight_decay": 0.009764221843653376,
+      "warmup_ratio": 0.09556630112107757
+    },
+    "dev_macro_f1": 0.684788,
+    "test_error_rate": 23.29,
+    "test_macro_f1": 0.6897,
+    "test_ece": 0.1007
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 10,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 2.1925376495416265e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 8,
+      "finetune_patience": 8,
+      "weight_decay": 0.05471855349200216,
+      "warmup_ratio": 0.18564104464159617
+    },
+    "dev_macro_f1": 0.681796,
+    "test_error_rate": 24.98,
+    "test_macro_f1": 0.6558,
+    "test_ece": 0.1367
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 25,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 0,
+    "best_params": {
+      "lr": 2.2940462959493208e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 8,
+      "finetune_patience": 5,
+      "weight_decay": 0.04729086077213403,
+      "warmup_ratio": 0.10244991966680977
+    },
+    "dev_macro_f1": 0.700151,
+    "test_error_rate": 24.17,
+    "test_macro_f1": 0.6787,
+    "test_ece": 0.1061
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 25,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 2.1064420652587304e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 11,
+      "finetune_patience": 10,
+      "weight_decay": 0.02092841722394552,
+      "warmup_ratio": 0.29909875185388757
+    },
+    "dev_macro_f1": 0.6845,
+    "test_error_rate": 25.54,
+    "test_macro_f1": 0.6754,
+    "test_ece": 0.1062
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 25,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 3.098397126717947e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 14,
+      "finetune_patience": 9,
+      "weight_decay": 0.02307657703065601,
+      "warmup_ratio": 0.008885930167359057
+    },
+    "dev_macro_f1": 0.717735,
+    "test_error_rate": 24.34,
+    "test_macro_f1": 0.6964,
+    "test_ece": 0.1084
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 50,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 5,
+    "best_params": {
+      "lr": 3.283328264988079e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 9,
+      "finetune_patience": 10,
+      "weight_decay": 0.01297160465712598,
+      "warmup_ratio": 0.08264811026078671
+    },
+    "dev_macro_f1": 0.713906,
+    "test_error_rate": 26.83,
+    "test_macro_f1": 0.6701,
+    "test_ece": 0.1182
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 50,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 7,
+    "best_params": {
+      "lr": 6.031448912264135e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 17,
+      "finetune_patience": 4,
+      "weight_decay": 0.08035021535344633,
+      "warmup_ratio": 0.19144401926888938
+    },
+    "dev_macro_f1": 0.712864,
+    "test_error_rate": 24.9,
+    "test_macro_f1": 0.6707,
+    "test_ece": 0.0711
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 50,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 1,
+    "best_params": {
+      "lr": 2.6557588225510032e-05,
+      "batch_size": 16,
+      "cotrain_epochs": 16,
+      "finetune_patience": 6,
+      "weight_decay": 0.06774106288276126,
+      "warmup_ratio": 0.2137303379818598
+    },
+    "dev_macro_f1": 0.708367,
+    "test_error_rate": 26.19,
+    "test_macro_f1": 0.6732,
+    "test_ece": 0.1168
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 5,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 0,
+    "best_params": {
+      "lr": 4.447319354480669e-05,
+      "batch_size": 8,
+      "cotrain_epochs": 13,
+      "finetune_patience": 5,
+      "weight_decay": 0.07983133540279067,
+      "warmup_ratio": 0.2988635851762412
+    },
+    "dev_macro_f1": 0.679193,
+    "test_error_rate": 25.22,
+    "test_macro_f1": 0.6771,
+    "test_ece": 0.1555
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 5,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 2,
+    "best_params": {
+      "lr": 6.143368974567872e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 12,
+      "finetune_patience": 9,
+      "weight_decay": 0.005563192834142661,
+      "warmup_ratio": 0.1424737170357069
+    },
+    "dev_macro_f1": 0.670411,
+    "test_error_rate": 23.13,
+    "test_macro_f1": 0.6647,
+    "test_ece": 0.1676
+  },
+  {
+    "event": "hurricane_florence_2018",
+    "budget": 5,
+    "seed_set": 3,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 7.993331361110385e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 16,
+      "finetune_patience": 6,
+      "weight_decay": 0.05651112414884729,
+      "warmup_ratio": 0.14148329743438298
+    },
+    "dev_macro_f1": 0.674238,
+    "test_error_rate": 24.42,
+    "test_macro_f1": 0.6447,
+    "test_ece": 0.188
+  },
+  {
+    "event": "hurricane_harvey_2017",
+    "budget": 5,
+    "seed_set": 1,
+    "n_trials": 10,
+    "best_trial": 1,
+    "best_params": {
+      "lr": 0.0001185236170201884,
+      "batch_size": 64,
+      "cotrain_epochs": 5,
+      "finetune_patience": 7,
+      "weight_decay": 0.05220350326239401,
+      "warmup_ratio": 0.269500580565166
+    },
+    "dev_macro_f1": 0.631836,
+    "test_error_rate": 32.02,
+    "test_macro_f1": 0.6248,
+    "test_ece": 0.2093
+  },
+  {
+    "event": "hurricane_harvey_2017",
+    "budget": 5,
+    "seed_set": 2,
+    "n_trials": 10,
+    "best_trial": 3,
+    "best_params": {
+      "lr": 6.153983261078592e-05,
+      "batch_size": 32,
+      "cotrain_epochs": 13,
+      "finetune_patience": 9,
+      "weight_decay": 0.029783940334811278,
+      "warmup_ratio": 0.08029786714979846
+    },
+    "dev_macro_f1": 0.63196,
+    "test_error_rate": 31.91,
+    "test_macro_f1": 0.6345,
+    "test_ece": 0.2447
+  }
+]

@@ -1,0 +1,159 @@
+{
+  "event": "hurricane_dorian_2019",
+  "budget": 50,
+  "seed_set": 1,
+  "status": "done",
+  "best_params": {
+    "lr": 4.880247632424306e-05,
+    "batch_size": 32,
+    "cotrain_epochs": 11,
+    "finetune_patience": 5,
+    "weight_decay": 0.025433834436270588,
+    "warmup_ratio": 0.27013995014608294
+  },
+  "best_value": 0.626896,
+  "n_trials": 10,
+  "continued_from": null,
+  "trials": [
+    {
+      "number": 0,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 5.017970884635557e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 7,
+        "finetune_patience": 8,
+        "weight_decay": 0.06768738591712,
+        "warmup_ratio": 0.02118792335781029
+      },
+      "dev_macro_f1": 0.611686,
+      "duration_seconds": 689.6
+    },
+    {
+      "number": 1,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 1.336244187115656e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 12,
+        "finetune_patience": 4,
+        "weight_decay": 0.055196626854523846,
+        "warmup_ratio": 0.11649204117836402
+      },
+      "dev_macro_f1": 0.595517,
+      "duration_seconds": 1177.2
+    },
+    {
+      "number": 2,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 4.880247632424306e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 11,
+        "finetune_patience": 5,
+        "weight_decay": 0.025433834436270588,
+        "warmup_ratio": 0.27013995014608294
+      },
+      "dev_macro_f1": 0.626896,
+      "duration_seconds": 875.6
+    },
+    {
+      "number": 3,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 2.7313291274839508e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 5,
+        "finetune_patience": 10,
+        "weight_decay": 0.02747459736551,
+        "warmup_ratio": 0.29816408593311555
+      },
+      "dev_macro_f1": 0.605328,
+      "duration_seconds": 577.1
+    },
+    {
+      "number": 4,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.000546662183472743,
+        "batch_size": 8,
+        "cotrain_epochs": 10,
+        "finetune_patience": 6,
+        "weight_decay": 0.03554015178257578,
+        "warmup_ratio": 0.19338994416374258
+      },
+      "dev_macro_f1": 0.035392,
+      "duration_seconds": 1029.2
+    },
+    {
+      "number": 5,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 2.866682634460938e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 11,
+        "finetune_patience": 9,
+        "weight_decay": 0.04004445215716795,
+        "warmup_ratio": 0.011247692137831954
+      },
+      "dev_macro_f1": 0.596323,
+      "duration_seconds": 868.4
+    },
+    {
+      "number": 6,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.0004939152129836554,
+        "batch_size": 8,
+        "cotrain_epochs": 14,
+        "finetune_patience": 4,
+        "weight_decay": 0.03875118934100247,
+        "warmup_ratio": 0.2799761927648973
+      },
+      "dev_macro_f1": 0.02759,
+      "duration_seconds": 1344.4
+    },
+    {
+      "number": 7,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 8.625926296231936e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 9,
+        "finetune_patience": 5,
+        "weight_decay": 0.06028656175552614,
+        "warmup_ratio": 0.1050225534475881
+      },
+      "dev_macro_f1": 0.610551,
+      "duration_seconds": 744.9
+    },
+    {
+      "number": 8,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 4.252184753634214e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 18,
+        "finetune_patience": 7,
+        "weight_decay": 0.036111380807626374,
+        "warmup_ratio": 0.2385254385077723
+      },
+      "dev_macro_f1": 0.615021,
+      "duration_seconds": 2087.2
+    },
+    {
+      "number": 9,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.0001724097810636736,
+        "batch_size": 32,
+        "cotrain_epochs": 18,
+        "finetune_patience": 6,
+        "weight_decay": 0.054670324403994865,
+        "warmup_ratio": 0.05290580677723509
+      },
+      "dev_macro_f1": 0.61022,
+      "duration_seconds": 1673.9
+    }
+  ]
+}
