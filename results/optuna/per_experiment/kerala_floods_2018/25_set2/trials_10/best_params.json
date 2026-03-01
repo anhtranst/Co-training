@@ -1,0 +1,159 @@
+{
+  "event": "kerala_floods_2018",
+  "budget": 25,
+  "seed_set": 2,
+  "status": "done",
+  "best_params": {
+    "lr": 1.1733447432439607e-05,
+    "batch_size": 8,
+    "cotrain_epochs": 5,
+    "finetune_patience": 8,
+    "weight_decay": 0.05329004287663389,
+    "warmup_ratio": 0.044317879716406945
+  },
+  "best_value": 0.600618,
+  "n_trials": 10,
+  "continued_from": null,
+  "trials": [
+    {
+      "number": 0,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 1.1733447432439607e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 5,
+        "finetune_patience": 8,
+        "weight_decay": 0.05329004287663389,
+        "warmup_ratio": 0.044317879716406945
+      },
+      "dev_macro_f1": 0.600618,
+      "duration_seconds": 729.9
+    },
+    {
+      "number": 1,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 6.020726738943944e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 19,
+        "finetune_patience": 5,
+        "weight_decay": 0.09771953818265977,
+        "warmup_ratio": 0.10203291043156337
+      },
+      "dev_macro_f1": 0.570541,
+      "duration_seconds": 2051.0
+    },
+    {
+      "number": 2,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.00012098675137260603,
+        "batch_size": 32,
+        "cotrain_epochs": 14,
+        "finetune_patience": 10,
+        "weight_decay": 0.06873743660790349,
+        "warmup_ratio": 0.07645300433899772
+      },
+      "dev_macro_f1": 0.586487,
+      "duration_seconds": 1250.5
+    },
+    {
+      "number": 3,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 6.322070275552621e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 10,
+        "finetune_patience": 5,
+        "weight_decay": 0.08785885967153696,
+        "warmup_ratio": 0.15412060607658282
+      },
+      "dev_macro_f1": 0.589341,
+      "duration_seconds": 1026.8
+    },
+    {
+      "number": 4,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.0007217238357887314,
+        "batch_size": 8,
+        "cotrain_epochs": 19,
+        "finetune_patience": 10,
+        "weight_decay": 0.04485765152057733,
+        "warmup_ratio": 0.21857988516979684
+      },
+      "dev_macro_f1": 0.077742,
+      "duration_seconds": 2066.0
+    },
+    {
+      "number": 5,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 5.698847020376609e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 20,
+        "finetune_patience": 4,
+        "weight_decay": 0.09712657492955377,
+        "warmup_ratio": 0.21708775336228817
+      },
+      "dev_macro_f1": 0.595612,
+      "duration_seconds": 1681.2
+    },
+    {
+      "number": 6,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.00034661864680899106,
+        "batch_size": 64,
+        "cotrain_epochs": 20,
+        "finetune_patience": 4,
+        "weight_decay": 0.05324815013006332,
+        "warmup_ratio": 0.235699607426678
+      },
+      "dev_macro_f1": 0.077742,
+      "duration_seconds": 1529.6
+    },
+    {
+      "number": 7,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.0006808892065432963,
+        "batch_size": 8,
+        "cotrain_epochs": 10,
+        "finetune_patience": 7,
+        "weight_decay": 0.007956362503183856,
+        "warmup_ratio": 0.025217496473387967
+      },
+      "dev_macro_f1": 0.023661,
+      "duration_seconds": 1191.8
+    },
+    {
+      "number": 8,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 0.00034825508446861494,
+        "batch_size": 16,
+        "cotrain_epochs": 15,
+        "finetune_patience": 7,
+        "weight_decay": 0.06609948792503843,
+        "warmup_ratio": 0.16776986065171293
+      },
+      "dev_macro_f1": 0.077742,
+      "duration_seconds": 1430.1
+    },
+    {
+      "number": 9,
+      "state": "COMPLETE",
+      "params": {
+        "lr": 1.955812990617637e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 18,
+        "finetune_patience": 8,
+        "weight_decay": 0.04373347760923851,
+        "warmup_ratio": 0.06376560065769059
+      },
+      "dev_macro_f1": 0.600586,
+      "duration_seconds": 1414.7
+    }
+  ]
+}

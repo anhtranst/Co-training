@@ -1,0 +1,1821 @@
+{
+  "total_studies": 120,
+  "completed": 120,
+  "failed": 0,
+  "n_trials_per_study": 10,
+  "search_space": {
+    "lr": "1e-5 to 1e-3 (log-uniform)",
+    "batch_size": [
+      8,
+      16,
+      32,
+      64
+    ],
+    "cotrain_epochs": "5 to 20",
+    "finetune_patience": "4 to 10",
+    "weight_decay": "0.0 to 0.1",
+    "warmup_ratio": "0.0 to 0.3"
+  },
+  "studies": [
+    {
+      "event": "california_wildfires_2018",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014751942279771948,
+        "batch_size": 16,
+        "cotrain_epochs": 17,
+        "finetune_patience": 6,
+        "weight_decay": 0.09788710035884163,
+        "warmup_ratio": 0.15070733655592253
+      },
+      "best_value": 0.630629
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014045420604759357,
+        "batch_size": 32,
+        "cotrain_epochs": 20,
+        "finetune_patience": 10,
+        "weight_decay": 0.09931941692821025,
+        "warmup_ratio": 0.13547364571858428
+      },
+      "best_value": 0.628636
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.435428009164826e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 6,
+        "finetune_patience": 6,
+        "weight_decay": 0.02897182193322132,
+        "warmup_ratio": 0.101024020744249
+      },
+      "best_value": 0.631253
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00016087489769288458,
+        "batch_size": 32,
+        "cotrain_epochs": 15,
+        "finetune_patience": 9,
+        "weight_decay": 0.014173351197259154,
+        "warmup_ratio": 0.1847534843660598
+      },
+      "best_value": 0.627186
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 2.5075300244682265e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 11,
+        "finetune_patience": 9,
+        "weight_decay": 0.0041374274059004625,
+        "warmup_ratio": 0.08917990238288648
+      },
+      "best_value": 0.649218
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 7.881352829491434e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 7,
+        "finetune_patience": 4,
+        "weight_decay": 0.07303498787260168,
+        "warmup_ratio": 0.26603069666185836
+      },
+      "best_value": 0.641599
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.49410222032117e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 5,
+        "finetune_patience": 5,
+        "weight_decay": 0.03534699864528932,
+        "warmup_ratio": 0.21218683735749722
+      },
+      "best_value": 0.630215
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 7.235758497640272e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 9,
+        "finetune_patience": 10,
+        "weight_decay": 0.03035058000558959,
+        "warmup_ratio": 0.057367984994053475
+      },
+      "best_value": 0.668912
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 7.974143120144007e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 12,
+        "finetune_patience": 4,
+        "weight_decay": 0.030387934388636274,
+        "warmup_ratio": 0.2110244029248216
+      },
+      "best_value": 0.639295
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 3.211222591920062e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 17,
+        "finetune_patience": 6,
+        "weight_decay": 0.05812907746724682,
+        "warmup_ratio": 0.04516032654255475
+      },
+      "best_value": 0.649113
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 5.8141404616733054e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 8,
+        "finetune_patience": 9,
+        "weight_decay": 0.0255711742456214,
+        "warmup_ratio": 0.058774894588774704
+      },
+      "best_value": 0.66102
+    },
+    {
+      "event": "california_wildfires_2018",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 6.540541729115279e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 6,
+        "finetune_patience": 6,
+        "weight_decay": 0.06501599040055,
+        "warmup_ratio": 0.1425691554084854
+      },
+      "best_value": 0.651661
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001721942345683964,
+        "batch_size": 16,
+        "cotrain_epochs": 10,
+        "finetune_patience": 10,
+        "weight_decay": 0.04053842770324332,
+        "warmup_ratio": 0.19050746904625823
+      },
+      "best_value": 0.630123
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 1.3491373838363608e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 7,
+        "finetune_patience": 10,
+        "weight_decay": 0.008095695916327972,
+        "warmup_ratio": 0.21093915949485886
+      },
+      "best_value": 0.654318
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 6.423663651264135e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 5,
+        "finetune_patience": 9,
+        "weight_decay": 0.04281254644585544,
+        "warmup_ratio": 0.2533073982807264
+      },
+      "best_value": 0.694543
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 8.239812945126067e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 19,
+        "finetune_patience": 10,
+        "weight_decay": 0.007770719677067828,
+        "warmup_ratio": 0.05734310047335886
+      },
+      "best_value": 0.654391
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 4.608915779652734e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 10,
+        "finetune_patience": 7,
+        "weight_decay": 0.027333102269306887,
+        "warmup_ratio": 0.10326043713370958
+      },
+      "best_value": 0.694568
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 1.241054520195743e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 5,
+        "finetune_patience": 6,
+        "weight_decay": 0.03599269849433819,
+        "warmup_ratio": 0.1066183902503916
+      },
+      "best_value": 0.698086
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.6504272649245174e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 8,
+        "finetune_patience": 10,
+        "weight_decay": 0.049486001722645126,
+        "warmup_ratio": 0.14147650014732224
+      },
+      "best_value": 0.712115
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 7.49001471627144e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 7,
+        "finetune_patience": 8,
+        "weight_decay": 0.08186706996609883,
+        "warmup_ratio": 0.23888004203920454
+      },
+      "best_value": 0.681968
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 1.6413243523500512e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 13,
+        "finetune_patience": 5,
+        "weight_decay": 0.014080592149637895,
+        "warmup_ratio": 0.0997869103776692
+      },
+      "best_value": 0.755307
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 1.3936313502439895e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 17,
+        "finetune_patience": 9,
+        "weight_decay": 0.08393471516148564,
+        "warmup_ratio": 0.22430653739627276
+      },
+      "best_value": 0.722241
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 5.09558671143145e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 12,
+        "finetune_patience": 9,
+        "weight_decay": 0.07636043969688029,
+        "warmup_ratio": 0.1540192673643603
+      },
+      "best_value": 0.704674
+    },
+    {
+      "event": "canada_wildfires_2016",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 4.4203401535294845e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 15,
+        "finetune_patience": 7,
+        "weight_decay": 0.0977582625176163,
+        "warmup_ratio": 0.003182528812138141
+      },
+      "best_value": 0.744694
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 3.416887568192935e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 13,
+        "finetune_patience": 10,
+        "weight_decay": 0.036818385504877385,
+        "warmup_ratio": 0.09977191720569374
+      },
+      "best_value": 0.575642
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 4.5268890588060405e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 5,
+        "finetune_patience": 5,
+        "weight_decay": 0.011166988078995889,
+        "warmup_ratio": 0.16915623345434003
+      },
+      "best_value": 0.580912
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 2.1198013734059526e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 18,
+        "finetune_patience": 9,
+        "weight_decay": 0.03563780108834096,
+        "warmup_ratio": 0.09295069316630314
+      },
+      "best_value": 0.504364
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 6.290736099224266e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 18,
+        "finetune_patience": 7,
+        "weight_decay": 0.04967929930771401,
+        "warmup_ratio": 0.03007625388050554
+      },
+      "best_value": 0.533099
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 4.6908867921091745e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 12,
+        "finetune_patience": 9,
+        "weight_decay": 0.05599363609141797,
+        "warmup_ratio": 0.09953799745925326
+      },
+      "best_value": 0.539312
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.7002243022809026e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 5,
+        "finetune_patience": 9,
+        "weight_decay": 0.08754848618353415,
+        "warmup_ratio": 0.07204033696047231
+      },
+      "best_value": 0.5069
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 4.1599948235971906e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 18,
+        "finetune_patience": 5,
+        "weight_decay": 0.06927780913690458,
+        "warmup_ratio": 0.24351329564418786
+      },
+      "best_value": 0.535604
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 6.82175409280196e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 5,
+        "finetune_patience": 6,
+        "weight_decay": 0.057573239486461425,
+        "warmup_ratio": 0.06587988039387883
+      },
+      "best_value": 0.515738
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 2.89599833867194e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 6,
+        "finetune_patience": 9,
+        "weight_decay": 0.061942046616273255,
+        "warmup_ratio": 0.21082118802214744
+      },
+      "best_value": 0.493542
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00011643086599876767,
+        "batch_size": 32,
+        "cotrain_epochs": 14,
+        "finetune_patience": 10,
+        "weight_decay": 0.08107621116953784,
+        "warmup_ratio": 0.1589258831482798
+      },
+      "best_value": 0.574216
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 2.4046855819167734e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 19,
+        "finetune_patience": 9,
+        "weight_decay": 0.05769839524201337,
+        "warmup_ratio": 0.2925749385608005
+      },
+      "best_value": 0.526541
+    },
+    {
+      "event": "cyclone_idai_2019",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 7.873612085515485e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 9,
+        "finetune_patience": 7,
+        "weight_decay": 0.0724963938112261,
+        "warmup_ratio": 0.12812667094425675
+      },
+      "best_value": 0.564668
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.6513833414644875e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 9,
+        "finetune_patience": 7,
+        "weight_decay": 0.0433211931775362,
+        "warmup_ratio": 0.2083744286858068
+      },
+      "best_value": 0.580101
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014369465662371044,
+        "batch_size": 16,
+        "cotrain_epochs": 14,
+        "finetune_patience": 8,
+        "weight_decay": 0.06196684750712033,
+        "warmup_ratio": 0.179831757844134
+      },
+      "best_value": 0.60355
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 7.665978287449936e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 17,
+        "finetune_patience": 5,
+        "weight_decay": 0.024463922286643826,
+        "warmup_ratio": 0.16185004742771888
+      },
+      "best_value": 0.549016
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00013123095308301198,
+        "batch_size": 32,
+        "cotrain_epochs": 13,
+        "finetune_patience": 8,
+        "weight_decay": 0.09226365039101496,
+        "warmup_ratio": 0.08628606674179075
+      },
+      "best_value": 0.585918
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 9.650365680109957e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 6,
+        "finetune_patience": 4,
+        "weight_decay": 0.06694649825317295,
+        "warmup_ratio": 0.035137589873009245
+      },
+      "best_value": 0.607868
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 9.823771420077114e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 18,
+        "finetune_patience": 8,
+        "weight_decay": 0.06073820320736544,
+        "warmup_ratio": 0.17469443596672715
+      },
+      "best_value": 0.575563
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014050536332073417,
+        "batch_size": 16,
+        "cotrain_epochs": 19,
+        "finetune_patience": 4,
+        "weight_decay": 0.02771163799174592,
+        "warmup_ratio": 0.03741296087724259
+      },
+      "best_value": 0.615927
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.000229219795401078,
+        "batch_size": 64,
+        "cotrain_epochs": 18,
+        "finetune_patience": 5,
+        "weight_decay": 0.0351383193683932,
+        "warmup_ratio": 0.29019797853102064
+      },
+      "best_value": 0.598522
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.093360457429734e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 8,
+        "finetune_patience": 4,
+        "weight_decay": 0.0815483853575753,
+        "warmup_ratio": 0.07434682179116296
+      },
+      "best_value": 0.606174
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 4.880247632424306e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 11,
+        "finetune_patience": 5,
+        "weight_decay": 0.025433834436270588,
+        "warmup_ratio": 0.27013995014608294
+      },
+      "best_value": 0.626896
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 6.411308514199175e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 5,
+        "finetune_patience": 10,
+        "weight_decay": 0.051634014028824754,
+        "warmup_ratio": 0.010132173866754622
+      },
+      "best_value": 0.611137
+    },
+    {
+      "event": "hurricane_dorian_2019",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00011738665243539033,
+        "batch_size": 32,
+        "cotrain_epochs": 5,
+        "finetune_patience": 8,
+        "weight_decay": 0.08501401595734925,
+        "warmup_ratio": 0.12689728652207075
+      },
+      "best_value": 0.623362
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 4.447319354480669e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 13,
+        "finetune_patience": 5,
+        "weight_decay": 0.07983133540279067,
+        "warmup_ratio": 0.2988635851762412
+      },
+      "best_value": 0.679193
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 6.143368974567872e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 12,
+        "finetune_patience": 9,
+        "weight_decay": 0.005563192834142661,
+        "warmup_ratio": 0.1424737170357069
+      },
+      "best_value": 0.670411
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 7.993331361110385e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 16,
+        "finetune_patience": 6,
+        "weight_decay": 0.05651112414884729,
+        "warmup_ratio": 0.14148329743438298
+      },
+      "best_value": 0.674238
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 1.5567531116186572e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 15,
+        "finetune_patience": 6,
+        "weight_decay": 0.09042520314152142,
+        "warmup_ratio": 0.05096566439146553
+      },
+      "best_value": 0.678816
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 3.2612349850132424e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 8,
+        "finetune_patience": 8,
+        "weight_decay": 0.009764221843653376,
+        "warmup_ratio": 0.09556630112107757
+      },
+      "best_value": 0.684788
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 2.1925376495416265e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 8,
+        "finetune_patience": 8,
+        "weight_decay": 0.05471855349200216,
+        "warmup_ratio": 0.18564104464159617
+      },
+      "best_value": 0.681796
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.2940462959493208e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 8,
+        "finetune_patience": 5,
+        "weight_decay": 0.04729086077213403,
+        "warmup_ratio": 0.10244991966680977
+      },
+      "best_value": 0.700151
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 2.1064420652587304e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 11,
+        "finetune_patience": 10,
+        "weight_decay": 0.02092841722394552,
+        "warmup_ratio": 0.29909875185388757
+      },
+      "best_value": 0.6845
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.098397126717947e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 14,
+        "finetune_patience": 9,
+        "weight_decay": 0.02307657703065601,
+        "warmup_ratio": 0.008885930167359057
+      },
+      "best_value": 0.717735
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 3.283328264988079e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 9,
+        "finetune_patience": 10,
+        "weight_decay": 0.01297160465712598,
+        "warmup_ratio": 0.08264811026078671
+      },
+      "best_value": 0.713906
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 6.031448912264135e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 17,
+        "finetune_patience": 4,
+        "weight_decay": 0.08035021535344633,
+        "warmup_ratio": 0.19144401926888938
+      },
+      "best_value": 0.712864
+    },
+    {
+      "event": "hurricane_florence_2018",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 2.6557588225510032e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 16,
+        "finetune_patience": 6,
+        "weight_decay": 0.06774106288276126,
+        "warmup_ratio": 0.2137303379818598
+      },
+      "best_value": 0.708367
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001185236170201884,
+        "batch_size": 64,
+        "cotrain_epochs": 5,
+        "finetune_patience": 7,
+        "weight_decay": 0.05220350326239401,
+        "warmup_ratio": 0.269500580565166
+      },
+      "best_value": 0.631836
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 6.153983261078592e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 13,
+        "finetune_patience": 9,
+        "weight_decay": 0.029783940334811278,
+        "warmup_ratio": 0.08029786714979846
+      },
+      "best_value": 0.63196
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.467489544607477e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 18,
+        "finetune_patience": 10,
+        "weight_decay": 0.09466339755041249,
+        "warmup_ratio": 0.0898743961667366
+      },
+      "best_value": 0.645701
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 5.987460564913411e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 9,
+        "finetune_patience": 10,
+        "weight_decay": 0.00012867434233299058,
+        "warmup_ratio": 0.038786930698973654
+      },
+      "best_value": 0.660337
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00020166446907814959,
+        "batch_size": 32,
+        "cotrain_epochs": 9,
+        "finetune_patience": 6,
+        "weight_decay": 0.043448758447270946,
+        "warmup_ratio": 0.09447684539774977
+      },
+      "best_value": 0.656831
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 1.828235155354883e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 6,
+        "finetune_patience": 6,
+        "weight_decay": 0.08481450502556237,
+        "warmup_ratio": 0.22315786114179725
+      },
+      "best_value": 0.661676
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00011835857040120951,
+        "batch_size": 32,
+        "cotrain_epochs": 7,
+        "finetune_patience": 10,
+        "weight_decay": 0.03488576877235622,
+        "warmup_ratio": 0.023345753238219157
+      },
+      "best_value": 0.682529
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00010557746713998014,
+        "batch_size": 64,
+        "cotrain_epochs": 5,
+        "finetune_patience": 6,
+        "weight_decay": 0.06210545094526494,
+        "warmup_ratio": 0.006269323296657414
+      },
+      "best_value": 0.688694
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001794952905712167,
+        "batch_size": 16,
+        "cotrain_epochs": 7,
+        "finetune_patience": 7,
+        "weight_decay": 0.07498767146759706,
+        "warmup_ratio": 0.05003718087447473
+      },
+      "best_value": 0.67368
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 1.161511016733164e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 6,
+        "finetune_patience": 10,
+        "weight_decay": 0.027704922733121185,
+        "warmup_ratio": 0.09504247979372982
+      },
+      "best_value": 0.676726
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 3.360221892385856e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 9,
+        "finetune_patience": 9,
+        "weight_decay": 0.08444311886796659,
+        "warmup_ratio": 0.09451918099813965
+      },
+      "best_value": 0.686465
+    },
+    {
+      "event": "hurricane_harvey_2017",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 5.9871969103696444e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 16,
+        "finetune_patience": 8,
+        "weight_decay": 0.08950738091113875,
+        "warmup_ratio": 0.15433876570190694
+      },
+      "best_value": 0.67579
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.3564523056500425e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 10,
+        "finetune_patience": 7,
+        "weight_decay": 0.047730251362732526,
+        "warmup_ratio": 0.0477052983624352
+      },
+      "best_value": 0.630078
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 3.8058228600340935e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 15,
+        "finetune_patience": 10,
+        "weight_decay": 0.08143041835014315,
+        "warmup_ratio": 0.14568519135052063
+      },
+      "best_value": 0.624922
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 5.4453566054894135e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 19,
+        "finetune_patience": 5,
+        "weight_decay": 0.05142114893242075,
+        "warmup_ratio": 0.10335497100868855
+      },
+      "best_value": 0.611687
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 4.182857930525891e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 6,
+        "finetune_patience": 7,
+        "weight_decay": 0.04674595145918035,
+        "warmup_ratio": 0.07029540427057597
+      },
+      "best_value": 0.626667
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001161615574505089,
+        "batch_size": 64,
+        "cotrain_epochs": 7,
+        "finetune_patience": 4,
+        "weight_decay": 0.0021693018888254366,
+        "warmup_ratio": 0.27057493780985997
+      },
+      "best_value": 0.645343
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 1.1494628985792206e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 15,
+        "finetune_patience": 8,
+        "weight_decay": 0.024773507698283403,
+        "warmup_ratio": 0.210102962827176
+      },
+      "best_value": 0.612849
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 1.6949680302147833e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 19,
+        "finetune_patience": 10,
+        "weight_decay": 0.04118372129183742,
+        "warmup_ratio": 0.26464771545761434
+      },
+      "best_value": 0.654858
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 1.766311263448425e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 6,
+        "finetune_patience": 8,
+        "weight_decay": 0.05027111493204969,
+        "warmup_ratio": 0.20576835901101861
+      },
+      "best_value": 0.646
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00017730138677097212,
+        "batch_size": 32,
+        "cotrain_epochs": 10,
+        "finetune_patience": 8,
+        "weight_decay": 0.055817604143272886,
+        "warmup_ratio": 0.17451471376244485
+      },
+      "best_value": 0.66406
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 1.703502535368932e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 15,
+        "finetune_patience": 9,
+        "weight_decay": 0.01969604785183058,
+        "warmup_ratio": 0.007677505185291499
+      },
+      "best_value": 0.644348
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 4.263472228312141e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 10,
+        "finetune_patience": 8,
+        "weight_decay": 0.030219693595733278,
+        "warmup_ratio": 0.01524666929882712
+      },
+      "best_value": 0.677011
+    },
+    {
+      "event": "hurricane_irma_2017",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 2.533689680042263e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 11,
+        "finetune_patience": 8,
+        "weight_decay": 0.03963253435052919,
+        "warmup_ratio": 0.2118351049773988
+      },
+      "best_value": 0.669459
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00011332834252864733,
+        "batch_size": 16,
+        "cotrain_epochs": 9,
+        "finetune_patience": 8,
+        "weight_decay": 0.03085761953181968,
+        "warmup_ratio": 0.07408641017372929
+      },
+      "best_value": 0.65077
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 8.576673883245582e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 14,
+        "finetune_patience": 8,
+        "weight_decay": 0.08122883886381038,
+        "warmup_ratio": 0.2955833436119584
+      },
+      "best_value": 0.689035
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.511919677915739e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 7,
+        "finetune_patience": 7,
+        "weight_decay": 0.04332087965142659,
+        "warmup_ratio": 0.12316105885582261
+      },
+      "best_value": 0.673256
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00010527689580755282,
+        "batch_size": 8,
+        "cotrain_epochs": 11,
+        "finetune_patience": 5,
+        "weight_decay": 0.08590527936864749,
+        "warmup_ratio": 0.05869800651704801
+      },
+      "best_value": 0.671464
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 8.270612785187651e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 16,
+        "finetune_patience": 6,
+        "weight_decay": 0.047237242692730996,
+        "warmup_ratio": 0.07980737271857181
+      },
+      "best_value": 0.690148
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 1.0459584475274466e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 16,
+        "finetune_patience": 7,
+        "weight_decay": 0.015286132190779856,
+        "warmup_ratio": 0.26206424360744685
+      },
+      "best_value": 0.675149
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 9.321928315529086e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 10,
+        "finetune_patience": 7,
+        "weight_decay": 0.0923489074779506,
+        "warmup_ratio": 0.08006916842719103
+      },
+      "best_value": 0.66744
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 7.089502766683809e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 7,
+        "finetune_patience": 6,
+        "weight_decay": 0.06012877405638576,
+        "warmup_ratio": 0.24895372818767503
+      },
+      "best_value": 0.69858
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014108736181279126,
+        "batch_size": 16,
+        "cotrain_epochs": 7,
+        "finetune_patience": 7,
+        "weight_decay": 0.07774822632861356,
+        "warmup_ratio": 0.19931216879641847
+      },
+      "best_value": 0.694318
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014432245661547525,
+        "batch_size": 16,
+        "cotrain_epochs": 15,
+        "finetune_patience": 5,
+        "weight_decay": 0.016715632510126144,
+        "warmup_ratio": 0.29002082064758333
+      },
+      "best_value": 0.688252
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 2.695858361583428e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 14,
+        "finetune_patience": 10,
+        "weight_decay": 0.0631910762732427,
+        "warmup_ratio": 0.12543556689284505
+      },
+      "best_value": 0.689272
+    },
+    {
+      "event": "hurricane_maria_2017",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 4.739446345125295e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 8,
+        "finetune_patience": 4,
+        "weight_decay": 0.05837527986957976,
+        "warmup_ratio": 0.057984394812060976
+      },
+      "best_value": 0.702946
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001736189395344692,
+        "batch_size": 16,
+        "cotrain_epochs": 12,
+        "finetune_patience": 10,
+        "weight_decay": 0.05761653597716111,
+        "warmup_ratio": 0.13166007764991586
+      },
+      "best_value": 0.681837
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0003147076624107919,
+        "batch_size": 64,
+        "cotrain_epochs": 10,
+        "finetune_patience": 5,
+        "weight_decay": 0.035266689566337606,
+        "warmup_ratio": 0.10608787206456458
+      },
+      "best_value": 0.65911
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001251683836672492,
+        "batch_size": 16,
+        "cotrain_epochs": 10,
+        "finetune_patience": 5,
+        "weight_decay": 0.052347391635180957,
+        "warmup_ratio": 0.13427935578277603
+      },
+      "best_value": 0.685848
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00010270260073707026,
+        "batch_size": 16,
+        "cotrain_epochs": 13,
+        "finetune_patience": 8,
+        "weight_decay": 0.02622657723884746,
+        "warmup_ratio": 0.28988147407267484
+      },
+      "best_value": 0.681806
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00013823659382482904,
+        "batch_size": 64,
+        "cotrain_epochs": 9,
+        "finetune_patience": 6,
+        "weight_decay": 0.005041084744890446,
+        "warmup_ratio": 0.169974100933397
+      },
+      "best_value": 0.65885
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.373143235328372e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 18,
+        "finetune_patience": 8,
+        "weight_decay": 0.0637427486340346,
+        "warmup_ratio": 0.18232948783779349
+      },
+      "best_value": 0.675725
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.0001245358057340035,
+        "batch_size": 64,
+        "cotrain_epochs": 14,
+        "finetune_patience": 10,
+        "weight_decay": 0.032304411947884935,
+        "warmup_ratio": 0.004765025802390732
+      },
+      "best_value": 0.718929
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00010587690934149764,
+        "batch_size": 8,
+        "cotrain_epochs": 16,
+        "finetune_patience": 10,
+        "weight_decay": 0.01593768728960777,
+        "warmup_ratio": 0.2669856020494045
+      },
+      "best_value": 0.682182
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00014471814240662589,
+        "batch_size": 16,
+        "cotrain_epochs": 12,
+        "finetune_patience": 4,
+        "weight_decay": 0.05580741785130157,
+        "warmup_ratio": 0.22763185876873
+      },
+      "best_value": 0.681481
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.8561012700052005e-05,
+        "batch_size": 16,
+        "cotrain_epochs": 5,
+        "finetune_patience": 9,
+        "weight_decay": 0.07386132168023943,
+        "warmup_ratio": 0.1663770735668266
+      },
+      "best_value": 0.690676
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00013808243523166832,
+        "batch_size": 32,
+        "cotrain_epochs": 7,
+        "finetune_patience": 8,
+        "weight_decay": 0.02078478896967724,
+        "warmup_ratio": 0.21498848200334159
+      },
+      "best_value": 0.689162
+    },
+    {
+      "event": "kaikoura_earthquake_2016",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00016505429677777034,
+        "batch_size": 32,
+        "cotrain_epochs": 14,
+        "finetune_patience": 10,
+        "weight_decay": 0.005921068975010913,
+        "warmup_ratio": 0.092108692576855
+      },
+      "best_value": 0.705257
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 5,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 1.0733261044592064e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 15,
+        "finetune_patience": 9,
+        "weight_decay": 0.029574818946882065,
+        "warmup_ratio": 0.06459141288701013
+      },
+      "best_value": 0.607049
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 5,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 1.967057535863202e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 19,
+        "finetune_patience": 9,
+        "weight_decay": 0.0810662680965945,
+        "warmup_ratio": 0.15157326144755698
+      },
+      "best_value": 0.625354
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 5,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 2.0411800763160968e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 10,
+        "finetune_patience": 6,
+        "weight_decay": 0.08602781408278819,
+        "warmup_ratio": 0.033579506452040594
+      },
+      "best_value": 0.615531
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 10,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 7.078558404266249e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 19,
+        "finetune_patience": 4,
+        "weight_decay": 0.07698561832521165,
+        "warmup_ratio": 0.08489594470204999
+      },
+      "best_value": 0.595439
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 10,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 2.168038831775358e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 11,
+        "finetune_patience": 8,
+        "weight_decay": 0.027123660620555125,
+        "warmup_ratio": 0.21123848374394977
+      },
+      "best_value": 0.627832
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 10,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 6.248710982175854e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 14,
+        "finetune_patience": 4,
+        "weight_decay": 0.03972571776766083,
+        "warmup_ratio": 0.06524475390620567
+      },
+      "best_value": 0.615922
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 25,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 2.5990851196127577e-05,
+        "batch_size": 32,
+        "cotrain_epochs": 11,
+        "finetune_patience": 7,
+        "weight_decay": 0.07435859578275358,
+        "warmup_ratio": 0.12577170655131675
+      },
+      "best_value": 0.596255
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 25,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 1.1733447432439607e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 5,
+        "finetune_patience": 8,
+        "weight_decay": 0.05329004287663389,
+        "warmup_ratio": 0.044317879716406945
+      },
+      "best_value": 0.600618
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 25,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 3.329835530588606e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 17,
+        "finetune_patience": 9,
+        "weight_decay": 0.04090881763063645,
+        "warmup_ratio": 0.19654694948005705
+      },
+      "best_value": 0.615507
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 50,
+      "seed_set": 1,
+      "status": "done",
+      "best_params": {
+        "lr": 0.00011091649284429983,
+        "batch_size": 32,
+        "cotrain_epochs": 5,
+        "finetune_patience": 7,
+        "weight_decay": 0.065685162702365,
+        "warmup_ratio": 0.1758557749104365
+      },
+      "best_value": 0.592043
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 50,
+      "seed_set": 2,
+      "status": "done",
+      "best_params": {
+        "lr": 2.6691406588131563e-05,
+        "batch_size": 8,
+        "cotrain_epochs": 6,
+        "finetune_patience": 7,
+        "weight_decay": 0.013319293750061134,
+        "warmup_ratio": 0.06424241587907224
+      },
+      "best_value": 0.617616
+    },
+    {
+      "event": "kerala_floods_2018",
+      "budget": 50,
+      "seed_set": 3,
+      "status": "done",
+      "best_params": {
+        "lr": 6.095240718106951e-05,
+        "batch_size": 64,
+        "cotrain_epochs": 8,
+        "finetune_patience": 6,
+        "weight_decay": 0.04816832789914728,
+        "warmup_ratio": 0.24787082479541947
+      },
+      "best_value": 0.640246
+    }
+  ]
+}
