@@ -74,3 +74,4 @@
 2026-03-01 23:21:51,109 - lg_cotrain - INFO - Phase 2 epoch 3/9: loss1=0.0391, loss2=0.1461, dev_macro_f1=0.6507, dev_err=21.13%
 2026-03-01 23:22:56,055 - lg_cotrain - INFO - Phase 2 epoch 4/9: loss1=0.0357, loss2=0.0834, dev_macro_f1=0.6505, dev_err=21.28%
 2026-03-01 23:24:01,958 - lg_cotrain - INFO - Phase 2 epoch 5/9: loss1=0.0258, loss2=0.0437, dev_macro_f1=0.6564, dev_err=22.38%
+2026-03-01 23:25:06,796 - lg_cotrain - INFO - Phase 2 epoch 6/9: loss1=0.0157, loss2=0.0304, dev_macro_f1=0.6483, dev_err=22.07%

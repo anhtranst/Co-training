@@ -169,3 +169,4 @@
 2026-03-01 23:24:01,413 - lg_cotrain - INFO - Phase 1 epoch 3/7: mean_prob1=0.1375, mean_prob2=0.1516
 2026-03-01 23:24:27,175 - lg_cotrain - INFO - Phase 1 epoch 4/7: mean_prob1=0.1560, mean_prob2=0.1573
 2026-03-01 23:24:51,921 - lg_cotrain - INFO - Phase 1 epoch 5/7: mean_prob1=0.1721, mean_prob2=0.1729
+2026-03-01 23:25:19,233 - lg_cotrain - INFO - Phase 1 epoch 6/7: mean_prob1=0.2074, mean_prob2=0.1869
