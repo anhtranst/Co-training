@@ -333,8 +333,7 @@ class LGCoTrainer:
             _min_count = int(_counts.min())
             df_dev_balanced = (
                 df_dev.groupby("class_label", group_keys=False)
-                .apply(lambda g: g.sample(min(len(g), _min_count),
-                                           random_state=cfg.seed_set))
+                .sample(n=_min_count, random_state=cfg.seed_set)
             )
             ds_dev_balanced = self._make_dataset(
                 df_dev_balanced["tweet_text"].tolist(),

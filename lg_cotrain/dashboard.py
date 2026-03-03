@@ -85,6 +85,8 @@ def discover_result_sets(results_root):
                     continue
                 if _has_metrics(exp_dir):
                     experiments.append((exp_dir.name, str(exp_dir)))
+            # Show "baseline" first, then the rest alphabetically.
+            experiments.sort(key=lambda x: (0 if x[0] == "baseline" else 1, x[0]))
             model_entry[type_dir.name] = experiments
         if model_entry:
             hierarchy[model_dir.name] = model_entry
@@ -1729,7 +1731,7 @@ def main():
         )
         n_models = len(result_sets)
 
-    Path(output).write_text(html)
+    Path(output).write_text(html, encoding="utf-8")
     print(f"Dashboard written to {output}")
     print(f"  {n_models} model(s), {total} total experiments")
 
