@@ -29,9 +29,11 @@ class LGCoTrainConfig:
     # Phase 3: Fine-tuning
     finetune_max_epochs: int = 100
     finetune_patience: int = 5
-    # Early stopping strategy: "baseline" | "no_early_stopping" | "per_class_patience"
-    #                          | "weighted_macro_f1" | "balanced_dev" | "scaled_threshold"
+    # Phase 3 early stopping strategy: "baseline" | "no_early_stopping" | "per_class_patience"
+    #                                  | "weighted_macro_f1" | "balanced_dev" | "scaled_threshold"
     stopping_strategy: str = "baseline"
+    # Phase 1 → Phase 2 seeding: "last" (default, per Algorithm 1) | "best" (best ensemble dev F1)
+    phase1_seed_strategy: str = "last"
 
     # Optimization
     batch_size: int = 32

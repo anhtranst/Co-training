@@ -100,6 +100,13 @@ class LGCoTrainer:
         set_seed(cfg.seed_set)
         logger.info(f"Starting LG-CoTrain: event={cfg.event}, budget={cfg.budget}, seed_set={cfg.seed_set}")
 
+        # Validate phase1_seed_strategy
+        if cfg.phase1_seed_strategy not in ("last", "best"):
+            raise ValueError(
+                f"Unknown phase1_seed_strategy: {cfg.phase1_seed_strategy!r}. "
+                "Valid: 'last', 'best'"
+            )
+
         # Load data
         df_labeled = load_tsv(cfg.labeled_path)
         df_unlabeled = load_tsv(cfg.unlabeled_path)
@@ -159,6 +166,10 @@ class LGCoTrainer:
         tracker1 = WeightTracker(num_dlg)
         tracker2 = WeightTracker(num_dlg)
 
+        # Track best Phase 1 epoch by ensemble dev macro-F1 (used when phase1_seed_strategy="best")
+        best_phase1_epoch = cfg.weight_gen_epochs - 1  # default: last epoch
+        best_phase1_f1 = -1.0
+
         for epoch in range(cfg.weight_gen_epochs):
             # Train model1 on D_l1
             model1.train()
@@ -190,10 +201,26 @@ class LGCoTrainer:
             tracker1.record_epoch(probs1)
             tracker2.record_epoch(probs2)
 
-            logger.info(
-                f"Phase 1 epoch {epoch+1}/{cfg.weight_gen_epochs}: "
-                f"mean_prob1={probs1.mean():.4f}, mean_prob2={probs2.mean():.4f}"
-            )
+            # Evaluate ensemble on dev for "best" seeding strategy
+            if cfg.phase1_seed_strategy == "best":
+                dev_preds_p1, dev_labels_p1, _ = ensemble_predict(
+                    model1, model2, loader_dev, self.device
+                )
+                dev_metrics_p1 = compute_metrics(dev_labels_p1, dev_preds_p1)
+                p1_dev_f1 = dev_metrics_p1["macro_f1"]
+                if p1_dev_f1 > best_phase1_f1:
+                    best_phase1_f1 = p1_dev_f1
+                    best_phase1_epoch = epoch
+                logger.info(
+                    f"Phase 1 epoch {epoch+1}/{cfg.weight_gen_epochs}: "
+                    f"mean_prob1={probs1.mean():.4f}, mean_prob2={probs2.mean():.4f}, "
+                    f"dev_macro_f1={p1_dev_f1:.4f}"
+                )
+            else:
+                logger.info(
+                    f"Phase 1 epoch {epoch+1}/{cfg.weight_gen_epochs}: "
+                    f"mean_prob1={probs1.mean():.4f}, mean_prob2={probs2.mean():.4f}"
+                )
 
         # ========================
         # Phase 2: Co-Training
@@ -220,11 +247,18 @@ class LGCoTrainer:
             f"total_steps_2={total_steps_2}, warmup={warmup_steps_2}"
         )
 
-        # Per Algorithm 1: seed Phase 2 trackers with only the final Phase 1 epoch.
-        # The paper uses the last Phase 1 epoch as the initial seeding point so that
-        # Phase 2 builds its own confidence/variability from a clean starting base.
-        cotrain_tracker1 = WeightTracker.seed_from_last_epoch(tracker1)
-        cotrain_tracker2 = WeightTracker.seed_from_last_epoch(tracker2)
+        # Seed Phase 2 trackers based on phase1_seed_strategy.
+        if cfg.phase1_seed_strategy == "best":
+            logger.info(
+                f"Phase 1 best epoch: {best_phase1_epoch + 1}/{cfg.weight_gen_epochs} "
+                f"(dev_macro_f1={best_phase1_f1:.4f})"
+            )
+            cotrain_tracker1 = WeightTracker.seed_from_epoch(tracker1, best_phase1_epoch)
+            cotrain_tracker2 = WeightTracker.seed_from_epoch(tracker2, best_phase1_epoch)
+        else:
+            # Default "last": per Algorithm 1, seed with final Phase 1 epoch.
+            cotrain_tracker1 = WeightTracker.seed_from_last_epoch(tracker1)
+            cotrain_tracker2 = WeightTracker.seed_from_last_epoch(tracker2)
 
         # Initial lambdas from seeded trackers (1 epoch -> variability=0, lambda1=lambda2=confidence)
         lambda1 = cotrain_tracker1.compute_lambda_optimistic()
@@ -449,6 +483,8 @@ class LGCoTrainer:
             "dev_macro_f1": dev_metrics["macro_f1"],
             "dev_ece": dev_ece,
             "stopping_strategy": cfg.stopping_strategy,
+            "phase1_seed_strategy": cfg.phase1_seed_strategy,
+            "phase1_best_epoch": best_phase1_epoch + 1 if cfg.phase1_seed_strategy == "best" else None,
             "lambda1_mean": float(lambda1.mean()),
             "lambda1_std": float(lambda1.std()),
             "lambda2_mean": float(lambda2.mean()),

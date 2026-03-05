@@ -167,6 +167,17 @@ As Phase 2 training proceeds and new probability observations accumulate each ep
    └────────────────────────┘        └────────────────────────┘
 ```
 
+#### Phase 1 Seeding Strategy
+
+The `--phase1-seed-strategy` flag controls which Phase 1 epoch's probability recordings are used to seed the Phase 2 `WeightTracker`.
+
+| Strategy | Source | How it works |
+| --- | --- | --- |
+| `last` (default) | **Algorithm 1 in the paper** (Rahman & Caragea, 2025) | Seeds Phase 2 with the **final** Phase 1 epoch's probabilities, regardless of performance. This is the original design from the paper. |
+| `best` | **Our experimental extension** | Evaluates ensemble macro-F1 on the dev set after **each** Phase 1 epoch, tracks the best score, and seeds Phase 2 from the epoch that achieved the highest ensemble dev macro-F1. |
+
+**Why experiment with `best`?** The paper's `last` strategy assumes that the final Phase 1 epoch produces the most useful probability estimates for computing lambda weights. However, Phase 1 models train on very small labeled splits (D_l1 and D_l2 — as few as 2-3 samples per class at budget=5). With so little data, these models can overfit quickly, meaning their later epochs may produce overconfident, less generalizable probability estimates over D_LG. The `best` strategy hypothesizes that an earlier epoch — where the models have learned useful patterns but have not yet overfit — may produce better-calibrated probabilities, leading to more effective lambda weights and ultimately stronger Phase 2 co-training. The selected "best" epoch is the one where the **ensemble** of both models achieves the highest macro-F1 on the held-out dev set, ensuring the seed reflects genuine generalization rather than memorization.
+
 ### Phase 2 — Co-Training
 
 **Goal**: Train strong classifiers on the large pseudo-labeled set, weighted by trust.
@@ -207,16 +218,18 @@ Each co-trained model fine-tunes on its respective labeled split (Model 1 on D_l
 
 The stopping criterion is selected with `--stopping-strategy`. All six strategies restore the best-ever model checkpoint when training ends, so the final model is never the last epoch but always the peak-performance epoch.
 
-The **core problem** that alternatives address: on imbalanced disaster datasets, majority classes (e.g. `not_humanitarian`) converge quickly and plateau macro-F1, causing `baseline` to stop before rare classes (e.g. `missing_or_found_people`) have finished learning.
+The **paper** (Rahman & Caragea, 2025, Algorithm 1) uses a single stopping criterion: patience=5 on dev macro-F1. This corresponds to our `baseline` strategy.
 
-| Strategy | How it decides to stop | Best used when |
-| --- | --- | --- |
-| `baseline` | Stops when **ensemble macro-F1** on the full dev set has not improved for `patience` epochs. Both models must independently exhaust patience. | Balanced class distributions; a good starting point for any event. |
-| `no_early_stopping` | Runs **all `finetune_max_epochs`** (default 100) and restores the best checkpoint seen across all epochs. Never stops early. | Diagnosing whether `baseline` stopped too soon; provides an upper-bound reference for other strategies. |
-| `per_class_patience` | Tracks F1 for **each class independently**. Stops only when **every** class has individually plateaued (patience exhausted per class). Checkpoints on improvement of the mean per-class F1. | Highly imbalanced events where rare classes are still improving long after majority classes plateau. |
-| `weighted_macro_f1` | Computes a **rare-class-weighted** stopping metric: each class's F1 is multiplied by its inverse frequency (normalized to mean weight = 1.0), so rare classes contribute proportionally more to the stopping signal. | Events with a few dominant classes and several rare ones — rare-class improvements are not washed out by majority-class plateaus. |
-| `balanced_dev` | Resamples the dev set to **equal class counts** (down-sampled to the smallest class) before computing the stopping metric. The full dev set is still used for logging. | Events with very large majority classes that dominate raw macro-F1; equal representation makes the stopping signal sensitive to all classes equally. |
-| `scaled_threshold` | Requires a **minimum improvement delta** before resetting patience. The delta scales with the class imbalance ratio (`max_freq / min_freq`): a ratio of 1 gives `delta = 0.001`; a ratio of 10 gives `delta = 0.01` (capped at 20×). | Highly imbalanced events where tiny noise fluctuations in macro-F1 can spuriously reset patience and delay stopping. |
+**Why experiment with alternatives?** The paper's `baseline` strategy uses standard macro-F1 as the stopping signal, which weights all classes equally. On imbalanced disaster datasets, majority classes (e.g. `not_humanitarian`) converge quickly and plateau macro-F1, causing early stopping to fire before rare classes (e.g. `missing_or_found_people`) have finished learning. Our five alternative strategies are designed to address this class imbalance problem by making the stopping signal more sensitive to rare-class progress, preventing premature stopping that sacrifices minority-class performance.
+
+| Strategy | Source | How it decides to stop | Best used when |
+| --- | --- | --- | --- |
+| `baseline` | **Paper** (Algorithm 1) | Stops when **ensemble macro-F1** on the full dev set has not improved for `patience` epochs. Both models must independently exhaust patience. | Balanced class distributions; a good starting point for any event. |
+| `no_early_stopping` | **Our extension** | Runs **all `finetune_max_epochs`** (default 100) and restores the best checkpoint seen across all epochs. Never stops early. | Diagnosing whether `baseline` stopped too soon; provides an upper-bound reference for other strategies. |
+| `per_class_patience` | **Our extension** | Tracks F1 for **each class independently**. Stops only when **every** class has individually plateaued (patience exhausted per class). Checkpoints on improvement of the mean per-class F1. | Highly imbalanced events where rare classes are still improving long after majority classes plateau. |
+| `weighted_macro_f1` | **Our extension** | Computes a **rare-class-weighted** stopping metric: each class's F1 is multiplied by its inverse frequency (normalized to mean weight = 1.0), so rare classes contribute proportionally more to the stopping signal. | Events with a few dominant classes and several rare ones — rare-class improvements are not washed out by majority-class plateaus. |
+| `balanced_dev` | **Our extension** | Resamples the dev set to **equal class counts** (down-sampled to the smallest class) before computing the stopping metric. The full dev set is still used for logging. | Events with very large majority classes that dominate raw macro-F1; equal representation makes the stopping signal sensitive to all classes equally. |
+| `scaled_threshold` | **Our extension** | Requires a **minimum improvement delta** before resetting patience. The delta scales with the class imbalance ratio (`max_freq / min_freq`): a ratio of 1 gives `delta = 0.001`; a ratio of 10 gives `delta = 0.01` (capped at 20×). | Highly imbalanced events where tiny noise fluctuations in macro-F1 can spuriously reset patience and delay stopping. |
 
 ```
     Which strategy fires earliest vs latest (typical ordering):
@@ -480,6 +493,7 @@ The script reports completed, missing, and failed studies, and writes `summary_{
 | `--finetune-max-epochs` | Phase 3 max epochs                  | `100`                           |
 | `--finetune-patience`   | Early stopping patience             | `5`                             |
 | `--stopping-strategy`  | Phase 3 early stopping strategy (`baseline`, `no_early_stopping`, `per_class_patience`, `weighted_macro_f1`, `balanced_dev`, `scaled_threshold`) | `baseline` |
+| `--phase1-seed-strategy` | Phase 1→2 seeding strategy (`last`, `best`) | `last`                        |
 | `--batch-size`          | Training batch size                 | `32`                            |
 | `--lr`                  | Learning rate                       | `2e-5`                          |
 | `--weight-decay`        | AdamW weight decay                  | `0.01`                          |
@@ -579,6 +593,8 @@ Results are saved under a 3-level hierarchy: `results/{model}/{type}/{experiment
   "dev_macro_f1": 0.5023,
   "dev_ece": 0.075,
   "stopping_strategy": "baseline",
+  "phase1_seed_strategy": "last",
+  "phase1_best_epoch": null,
   "lambda1_mean": 0.7234,
   "lambda1_std": 0.1456,
   "lambda2_mean": 0.5891,
@@ -596,6 +612,8 @@ Results are saved under a 3-level hierarchy: `results/{model}/{type}/{experiment
 | `dev_macro_f1`                 | Macro-averaged F1 on development set   |
 | `dev_ece`                      | Expected Calibration Error on dev set  |
 | `stopping_strategy`            | Phase 3 early stopping strategy used   |
+| `phase1_seed_strategy`         | Phase 1→2 seeding strategy used        |
+| `phase1_best_epoch`            | Best Phase 1 epoch (1-indexed, null if strategy is "last") |
 | `lambda1_mean` / `lambda1_std` | Statistics of optimistic weights       |
 | `lambda2_mean` / `lambda2_std` | Statistics of conservative weights     |
 
@@ -768,6 +786,8 @@ python -m unittest tests/test_evaluate.py
 - **Configurable early stopping strategy**: The `stopping_strategy` field in `LGCoTrainConfig` (default `"baseline"`) selects how Phase 3 decides when to stop. Six strategies are supported: standard patience on ensemble macro-F1, no early stopping, per-class patience, rare-class-weighted metric, resampled dev set, and imbalance-scaled improvement threshold. Pass `--stopping-strategy` on the CLI to switch strategies without code changes.
 
 - **Paper-aligned Phase 1 → Phase 2 seeding**: `WeightTracker.seed_from_last_epoch()` seeds Phase 2 with only the final Phase 1 epoch's probabilities, matching Algorithm 1 in the paper. The earlier `seed_from_tracker()` (full-history copy) is retained for reference.
+
+- **Best-epoch Phase 1 seeding (our extension)**: The `phase1_seed_strategy` field (default `"last"`) controls which Phase 1 epoch seeds Phase 2. The paper's Algorithm 1 uses the last epoch (`"last"`). Our `"best"` strategy evaluates ensemble macro-F1 on the dev set after each Phase 1 epoch and selects the best-performing one via `WeightTracker.seed_from_epoch()`. The hypothesis is that Phase 1 models — trained on very small labeled splits — may overfit in later epochs, and seeding from the best-generalizing epoch could produce better-calibrated lambda weights for Phase 2 co-training.
 
 ---
 

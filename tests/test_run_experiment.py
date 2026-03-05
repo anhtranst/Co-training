@@ -220,6 +220,37 @@ class TestCLIValidation(unittest.TestCase):
         self.assertEqual(kwargs["batch_size"], 32)
         self.assertEqual(kwargs["pseudo_label_source"], "gpt-4o")
 
+    def test_phase1_seed_strategy_default(self):
+        from lg_cotrain.run_experiment import main
+
+        with patch("sys.argv", [
+            "run_experiment", "--event", "test_event",
+        ]):
+            with patch("lg_cotrain.run_experiment.run_all_experiments") as mock_run:
+                mock_run.return_value = [_make_result()]
+                with patch("lg_cotrain.run_experiment.format_summary_table",
+                           return_value=""):
+                    main()
+
+        _, kwargs = mock_run.call_args
+        self.assertEqual(kwargs["phase1_seed_strategy"], "last")
+
+    def test_phase1_seed_strategy_best_forwarded(self):
+        from lg_cotrain.run_experiment import main
+
+        with patch("sys.argv", [
+            "run_experiment", "--event", "test_event",
+            "--phase1-seed-strategy", "best",
+        ]):
+            with patch("lg_cotrain.run_experiment.run_all_experiments") as mock_run:
+                mock_run.return_value = [_make_result()]
+                with patch("lg_cotrain.run_experiment.format_summary_table",
+                           return_value=""):
+                    main()
+
+        _, kwargs = mock_run.call_args
+        self.assertEqual(kwargs["phase1_seed_strategy"], "best")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -100,6 +100,33 @@ class WeightTracker:
         return new_tracker
 
     @classmethod
+    def seed_from_epoch(cls, source: "WeightTracker", epoch_idx: int) -> "WeightTracker":
+        """Create a new tracker seeded with a specific epoch from the source.
+
+        Args:
+            source: The source WeightTracker containing recorded epochs.
+            epoch_idx: Zero-based index of the epoch to use as seed.
+
+        Returns:
+            A new WeightTracker with exactly one recorded epoch (the selected one).
+
+        Raises:
+            IndexError: If epoch_idx is out of range.
+        """
+        if epoch_idx < 0 or epoch_idx >= len(source.prob_history):
+            raise IndexError(
+                f"epoch_idx {epoch_idx} out of range for tracker with "
+                f"{len(source.prob_history)} recorded epochs"
+            )
+        new_tracker = cls(source.num_samples)
+        selected_probs = source.prob_history[epoch_idx]
+        if HAS_NUMPY and isinstance(selected_probs, np.ndarray):
+            new_tracker.prob_history.append(selected_probs.copy())
+        else:
+            new_tracker.prob_history.append(list(selected_probs))
+        return new_tracker
+
+    @classmethod
     def seed_from_last_epoch(cls, source: "WeightTracker") -> "WeightTracker":
         """Create a new tracker seeded with only the source's final epoch.
 

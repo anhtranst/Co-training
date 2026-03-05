@@ -388,6 +388,29 @@ class TestCustomBudgetsAndSeedSets(unittest.TestCase):
         self.assertEqual(configs_seen[0].pseudo_label_source, "llama-3")
         self.assertIn("llama-3", configs_seen[0].pseudo_label_path)
 
+    def test_phase1_seed_strategy_forwarded(self):
+        from lg_cotrain.run_all import run_all_experiments
+
+        configs_seen = []
+
+        def capturing_cls(config):
+            configs_seen.append(config)
+            return _fake_trainer_cls(config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_all_experiments(
+                "test_event",
+                phase1_seed_strategy="best",
+                budgets=[5],
+                seed_sets=[1],
+                data_root=tmpdir,
+                results_root=tmpdir,
+                _trainer_cls=capturing_cls,
+            )
+
+        self.assertEqual(len(configs_seen), 1)
+        self.assertEqual(configs_seen[0].phase1_seed_strategy, "best")
+
 
 class TestOnExperimentDoneCallback(unittest.TestCase):
     """Tests for the _on_experiment_done callback parameter."""

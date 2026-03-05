@@ -179,6 +179,25 @@ class TestConfigDevice(unittest.TestCase):
         self.assertEqual(cfg1.output_dir, cfg2.output_dir)
 
 
+class TestConfigPhase1SeedStrategy(unittest.TestCase):
+    """phase1_seed_strategy config field."""
+
+    def test_default_is_last(self):
+        cfg = LGCoTrainConfig()
+        self.assertEqual(cfg.phase1_seed_strategy, "last")
+
+    def test_custom_best(self):
+        cfg = LGCoTrainConfig(phase1_seed_strategy="best")
+        self.assertEqual(cfg.phase1_seed_strategy, "best")
+
+    def test_does_not_affect_paths(self):
+        cfg1 = LGCoTrainConfig(event="canada_wildfires_2016", budget=5, seed_set=1)
+        cfg2 = LGCoTrainConfig(event="canada_wildfires_2016", budget=5, seed_set=1,
+                                phase1_seed_strategy="best")
+        self.assertEqual(cfg1.labeled_path, cfg2.labeled_path)
+        self.assertEqual(cfg1.output_dir, cfg2.output_dir)
+
+
 class TestConfigCustomRoots(unittest.TestCase):
     """Custom data_root and results_root."""
 

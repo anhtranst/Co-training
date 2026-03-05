@@ -241,5 +241,140 @@ class TestFullPipelineTiny(unittest.TestCase):
             self.assertEqual(saved["test_error_rate"], results["test_error_rate"])
 
 
+    def test_full_pipeline_best_seed_strategy(self):
+        """End-to-end with phase1_seed_strategy='best'."""
+        try:
+            import torch
+            import transformers
+            import pandas
+            import sklearn
+        except ImportError:
+            self.skipTest("torch/transformers/pandas/sklearn not available")
+
+        from lg_cotrain.config import LGCoTrainConfig
+        from lg_cotrain.trainer import LGCoTrainer
+
+        with tempfile.TemporaryDirectory() as tmp_path:
+            paths = self._make_tiny_data(tmp_path)
+            cfg = LGCoTrainConfig(
+                event="test",
+                budget=5,
+                seed_set=1,
+                model_name="prajjwal1/bert-tiny",
+                num_labels=10,
+                weight_gen_epochs=2,
+                cotrain_epochs=2,
+                finetune_max_epochs=3,
+                finetune_patience=2,
+                batch_size=8,
+                max_seq_length=32,
+                phase1_seed_strategy="best",
+            )
+            cfg.labeled_path = paths["labeled"]
+            cfg.unlabeled_path = paths["unlabeled"]
+            cfg.pseudo_label_path = paths["pseudo"]
+            cfg.dev_path = paths["dev"]
+            cfg.test_path = paths["test"]
+            cfg.output_dir = os.path.join(tmp_path, "results")
+
+            trainer = LGCoTrainer(cfg)
+            results = trainer.run()
+
+            # Verify output structure
+            self.assertIn("test_macro_f1", results)
+            self.assertEqual(results["phase1_seed_strategy"], "best")
+            self.assertIsNotNone(results["phase1_best_epoch"])
+            self.assertGreaterEqual(results["phase1_best_epoch"], 1)
+            self.assertLessEqual(results["phase1_best_epoch"], 2)
+
+            # Verify metrics.json
+            metrics_path = os.path.join(tmp_path, "results", "metrics.json")
+            with open(metrics_path) as f:
+                saved = json.load(f)
+            self.assertEqual(saved["phase1_seed_strategy"], "best")
+            self.assertIsNotNone(saved["phase1_best_epoch"])
+
+    def test_full_pipeline_last_strategy_records_field(self):
+        """Default phase1_seed_strategy='last' records correctly in metrics."""
+        try:
+            import torch
+            import transformers
+            import pandas
+            import sklearn
+        except ImportError:
+            self.skipTest("torch/transformers/pandas/sklearn not available")
+
+        from lg_cotrain.config import LGCoTrainConfig
+        from lg_cotrain.trainer import LGCoTrainer
+
+        with tempfile.TemporaryDirectory() as tmp_path:
+            paths = self._make_tiny_data(tmp_path)
+            cfg = LGCoTrainConfig(
+                event="test",
+                budget=5,
+                seed_set=1,
+                model_name="prajjwal1/bert-tiny",
+                num_labels=10,
+                weight_gen_epochs=2,
+                cotrain_epochs=2,
+                finetune_max_epochs=3,
+                finetune_patience=2,
+                batch_size=8,
+                max_seq_length=32,
+            )
+            cfg.labeled_path = paths["labeled"]
+            cfg.unlabeled_path = paths["unlabeled"]
+            cfg.pseudo_label_path = paths["pseudo"]
+            cfg.dev_path = paths["dev"]
+            cfg.test_path = paths["test"]
+            cfg.output_dir = os.path.join(tmp_path, "results")
+
+            trainer = LGCoTrainer(cfg)
+            results = trainer.run()
+
+            self.assertEqual(results["phase1_seed_strategy"], "last")
+            self.assertIsNone(results["phase1_best_epoch"])
+
+    def test_invalid_phase1_seed_strategy_raises(self):
+        """Unknown phase1_seed_strategy raises ValueError."""
+        try:
+            import torch
+            import transformers
+            import pandas
+            import sklearn
+        except ImportError:
+            self.skipTest("torch/transformers/pandas/sklearn not available")
+
+        from lg_cotrain.config import LGCoTrainConfig
+        from lg_cotrain.trainer import LGCoTrainer
+
+        with tempfile.TemporaryDirectory() as tmp_path:
+            paths = self._make_tiny_data(tmp_path)
+            cfg = LGCoTrainConfig(
+                event="test",
+                budget=5,
+                seed_set=1,
+                model_name="prajjwal1/bert-tiny",
+                num_labels=10,
+                weight_gen_epochs=2,
+                cotrain_epochs=2,
+                finetune_max_epochs=3,
+                finetune_patience=2,
+                batch_size=8,
+                max_seq_length=32,
+                phase1_seed_strategy="invalid",
+            )
+            cfg.labeled_path = paths["labeled"]
+            cfg.unlabeled_path = paths["unlabeled"]
+            cfg.pseudo_label_path = paths["pseudo"]
+            cfg.dev_path = paths["dev"]
+            cfg.test_path = paths["test"]
+            cfg.output_dir = os.path.join(tmp_path, "results")
+
+            trainer = LGCoTrainer(cfg)
+            with self.assertRaises(ValueError):
+                trainer.run()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

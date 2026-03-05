@@ -324,5 +324,83 @@ class TestWeightTrackerSeedFromLastEpoch(unittest.TestCase):
         self.assertAlmostEqual(source.prob_history[-1][0], 0.7, places=6)
 
 
+class TestWeightTrackerSeedFromEpoch(unittest.TestCase):
+    """Test the seed_from_epoch classmethod."""
+
+    def test_seeded_tracker_has_exactly_one_epoch(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        source.record_epoch([0.7, 0.5, 0.8])
+        seeded = WeightTracker.seed_from_epoch(source, epoch_idx=1)
+        self.assertEqual(seeded.num_epochs_recorded, 1)
+
+    def test_seeded_probs_match_selected_epoch(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        source.record_epoch([0.7, 0.5, 0.8])
+        seeded = WeightTracker.seed_from_epoch(source, epoch_idx=1)
+        conf = seeded.compute_confidence()
+        expected = [0.6, 0.4, 0.9]
+        for a, b in zip(conf, expected):
+            self.assertAlmostEqual(a, b, places=6)
+
+    def test_epoch_zero_selects_first(self):
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.1, 0.2])
+        source.record_epoch([0.9, 0.8])
+        seeded = WeightTracker.seed_from_epoch(source, epoch_idx=0)
+        conf = seeded.compute_confidence()
+        self.assertAlmostEqual(conf[0], 0.1, places=6)
+        self.assertAlmostEqual(conf[1], 0.2, places=6)
+
+    def test_last_epoch_matches_seed_from_last_epoch(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        from_last = WeightTracker.seed_from_last_epoch(source)
+        from_epoch = WeightTracker.seed_from_epoch(source, epoch_idx=1)
+        for a, b in zip(from_last.compute_confidence(), from_epoch.compute_confidence()):
+            self.assertAlmostEqual(a, b, places=6)
+
+    def test_out_of_range_raises_index_error(self):
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.5])
+        with self.assertRaises(IndexError):
+            WeightTracker.seed_from_epoch(source, epoch_idx=5)
+
+    def test_negative_index_raises_index_error(self):
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.5])
+        with self.assertRaises(IndexError):
+            WeightTracker.seed_from_epoch(source, epoch_idx=-1)
+
+    def test_variability_zero_after_single_epoch_seed(self):
+        source = WeightTracker(num_samples=3)
+        source.record_epoch([0.8, 0.6, 0.7])
+        source.record_epoch([0.6, 0.4, 0.9])
+        seeded = WeightTracker.seed_from_epoch(source, epoch_idx=0)
+        for v in seeded.compute_variability():
+            self.assertAlmostEqual(v, 0.0, places=6)
+
+    def test_is_independent_of_source(self):
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.5])
+        source.record_epoch([0.7, 0.3])
+        seeded = WeightTracker.seed_from_epoch(source, epoch_idx=0)
+        seeded.record_epoch([0.9, 0.1])
+        self.assertEqual(source.num_epochs_recorded, 2)
+        self.assertEqual(seeded.num_epochs_recorded, 2)
+
+    def test_data_is_deep_copy(self):
+        source = WeightTracker(num_samples=2)
+        source.record_epoch([0.5, 0.6])
+        source.record_epoch([0.7, 0.8])
+        seeded = WeightTracker.seed_from_epoch(source, epoch_idx=0)
+        seeded.prob_history[0][0] = 999.0
+        self.assertAlmostEqual(source.prob_history[0][0], 0.5, places=6)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

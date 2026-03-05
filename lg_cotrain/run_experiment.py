@@ -70,6 +70,11 @@ def main():
         ],
         help="Phase 3 early stopping strategy (default: baseline)",
     )
+    parser.add_argument(
+        "--phase1-seed-strategy", type=str, default="last",
+        choices=["last", "best"],
+        help="Phase 1→2 seeding strategy: 'last' (default, per Algorithm 1) or 'best' (best ensemble dev F1)",
+    )
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--weight-decay", type=float, default=0.01)
@@ -102,6 +107,7 @@ def main():
         finetune_max_epochs=args.finetune_max_epochs,
         finetune_patience=args.finetune_patience,
         stopping_strategy=args.stopping_strategy,
+        phase1_seed_strategy=args.phase1_seed_strategy,
         batch_size=args.batch_size,
         lr=args.lr,
         weight_decay=args.weight_decay,
