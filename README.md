@@ -54,79 +54,35 @@ The result is a classifier that significantly outperforms training on labeled da
 
 The pipeline has three phases, each building on the previous one. Two BERT models work together throughout, exchanging information about which pseudo-labels they trust.
 
-```
-                        ┌─────────────────────────────────────────────────┐
-                        │              INPUT DATA                         │
-                        │                                                 │
-                        │  D_labeled ──► split ──► D_l1 (half 1)         │
-                        │                     └──► D_l2 (half 2)         │
-                        │                                                 │
-                        │  D_unlabeled + LLM pseudo-labels ──► D_LG      │
-                        │  D_dev  (development set for early stopping)    │
-                        │  D_test (held-out test set)                     │
-                        └─────────────────────────────────────────────────┘
-                                            │
-                    ┌───────────────────────┬┘
-                    ▼                       ▼
-        ┌───────────────────┐   ┌───────────────────┐
-        │   BERT Model 1    │   │   BERT Model 2    │
-        │   (trained on     │   │   (trained on     │
-        │    D_l1)          │   │    D_l2)          │
-        └────────┬──────────┘   └──────────┬────────┘
-                 │                          │
-                 │  ┌──────────────────┐    │
-                 └─►│  PHASE 1         │◄───┘
-                    │  Weight          │
-                    │  Generation      │
-                    │  (7 epochs)      │
-                    └────────┬─────────┘
-                             │
-                  Compute lambda weights
-                  from probability history
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                              ▼
-    ┌──────────────────┐          ┌──────────────────┐
-    │  lambda1          │          │  lambda2          │
-    │  (optimistic)     │          │  (conservative)   │
-    │  = conf + var     │          │  = conf - var     │
-    └────────┬─────────┘          └─────────┬────────┘
-             │                               │
-             │  ┌──────────────────────┐     │
-             │  │  PHASE 2             │     │
-             └─►│  Co-Training         │◄────┘
-                │  (10 epochs)         │
-                │                      │
-                │  Model 1 trained     │
-                │  with lambda2 wts    │
-                │  (from Model 2)      │
-                │                      │
-                │  Model 2 trained     │
-                │  with lambda1 wts    │
-                │  (from Model 1)      │
-                └──────────┬───────────┘
-                           │
-              ┌────────────┴────────────┐
-              ▼                          ▼
-    ┌──────────────────┐      ┌──────────────────┐
-    │  PHASE 3          │      │  PHASE 3          │
-    │  Fine-Tune        │      │  Fine-Tune        │
-    │  Model 1 on D_l1  │      │  Model 2 on D_l2  │
-    │  (early stopping  │      │  (early stopping   │
-    │   on dev F1)      │      │   on dev F1)       │
-    └────────┬─────────┘      └─────────┬─────────┘
-             │                           │
-             └─────────┬─────────────────┘
-                       ▼
-              ┌──────────────────┐
-              │  ENSEMBLE         │
-              │  Average softmax  │
-              │  from both models │
-              │  then argmax      │
-              └──────────────────┘
-                       │
-                       ▼
-                 Final Predictions
+```mermaid
+graph TD
+    subgraph INPUT["INPUT DATA"]
+        DL["D_labeled"] -->|split| DL1["D_l1 (half 1)"]
+        DL -->|split| DL2["D_l2 (half 2)"]
+        DU["D_unlabeled + LLM pseudo-labels"] --> DLG["D_LG"]
+        DDEV["D_dev (development set)"]
+        DTEST["D_test (held-out test set)"]
+    end
+
+    DL1 --> M1["BERT Model 1<br/>(trained on D_l1)"]
+    DL2 --> M2["BERT Model 2<br/>(trained on D_l2)"]
+
+    M1 --> P1["<b>PHASE 1</b><br/>Weight Generation<br/>(7 epochs)"]
+    M2 --> P1
+
+    P1 -->|"Compute lambda weights<br/>from probability history"| L1["lambda1 (optimistic)<br/>= conf + var"]
+    P1 -->|"Compute lambda weights<br/>from probability history"| L2["lambda2 (conservative)<br/>= conf − var"]
+
+    L1 --> P2["<b>PHASE 2</b><br/>Co-Training (10 epochs)<br/><br/>Model 1 trained with lambda2 wts (from Model 2)<br/>Model 2 trained with lambda1 wts (from Model 1)"]
+    L2 --> P2
+
+    P2 --> P3A["<b>PHASE 3</b><br/>Fine-Tune Model 1 on D_l1<br/>(early stopping on dev F1)"]
+    P2 --> P3B["<b>PHASE 3</b><br/>Fine-Tune Model 2 on D_l2<br/>(early stopping on dev F1)"]
+
+    P3A --> ENS["<b>ENSEMBLE</b><br/>Average softmax from both models<br/>then argmax"]
+    P3B --> ENS
+
+    ENS --> PRED["Final Predictions"]
 ```
 
 ### Phase 1 — Weight Generation
@@ -189,21 +145,12 @@ Two **new** BERT models are initialized fresh. They train on D_LG using **weight
 
 This cross-weighting is the core of co-training — each model guides the other by sharing its perspective on pseudo-label quality. Each Phase 2 epoch, both models re-evaluate D_LG and the new probability observations are added to the tracker, so confidence and variability (and thus lambda weights) are recomputed with increasing history.
 
-```
-    Cross-Weight Exchange in Co-Training
-
-    Model 1                          Model 2
-    ┌──────────────┐                ┌──────────────┐
-    │              │   lambda2      │              │
-    │  Trains on   │◄────────────── │  Provides    │
-    │  D_LG with   │   (conservative│  conservative│
-    │  lambda2 wts │    weights)    │  weights     │
-    │              │                │              │
-    │  Provides    │   lambda1      │  Trains on   │
-    │  optimistic  │───────────────►│  D_LG with   │
-    │  weights     │   (optimistic  │  lambda1 wts │
-    │              │    weights)    │              │
-    └──────────────┘                └──────────────┘
+```mermaid
+graph LR
+    M1["<b>Model 1</b><br/>Trains on D_LG with<br/>lambda2 weights<br/><i>(from Model 2)</i>"]
+    M2["<b>Model 2</b><br/>Trains on D_LG with<br/>lambda1 weights<br/><i>(from Model 1)</i>"]
+    M2 -- "lambda2 (conservative)" --> M1
+    M1 -- "lambda1 (optimistic)" --> M2
 ```
 
 ### Phase 3 — Fine-Tuning
@@ -242,19 +189,14 @@ The **paper** (Rahman & Caragea, 2025, Algorithm 1) uses a single stopping crite
     no_early_stopping ───────────────►  never stops early (runs all epochs)
 ```
 
-```
-    Ensemble Prediction
-
-    Input tweet: "People trapped under rubble, need help!"
-
-    Model 1 softmax:  [0.01, 0.02, 0.05, 0.60, 0.02, ...]
-    Model 2 softmax:  [0.02, 0.01, 0.08, 0.55, 0.03, ...]
-                       ─────────────────────────────────────
-    Average:          [0.015, 0.015, 0.065, 0.575, 0.025, ...]
-                                            ▲
-                                         argmax
-                                            │
-    Prediction: "injured_or_dead_people" ◄──┘
+```mermaid
+graph TD
+    INPUT["Input tweet:<br/><i>'People trapped under rubble, need help!'</i>"]
+    INPUT --> M1["Model 1 softmax<br/>[0.01, 0.02, 0.05, <b>0.60</b>, 0.02, ...]"]
+    INPUT --> M2["Model 2 softmax<br/>[0.02, 0.01, 0.08, <b>0.55</b>, 0.03, ...]"]
+    M1 --> AVG["Average softmax<br/>[0.015, 0.015, 0.065, <b>0.575</b>, 0.025, ...]"]
+    M2 --> AVG
+    AVG -->|argmax| PRED["Prediction: <b>injured_or_dead_people</b>"]
 ```
 
 ---
@@ -691,19 +633,21 @@ results/                             # Experiment outputs + dashboard
 
 ### Module Dependency Graph
 
-```
-    optuna_tuner.py ─────────► trainer.py (via _trainer_cls injection)
-    optuna_per_experiment.py ─► trainer.py (via _trainer_cls injection)
-    run_experiment.py ──► run_all.py ──► trainer.py
-                              │              │
-                              │         ┌────┴─────────────────┐
-                              │         │    │    │    │       │
-                              │         ▼    ▼    ▼    ▼       ▼
-                              │      config  data  model eval  utils
-                              │              loading          weight
-                              │                               tracker
-                              ▼
-                         dashboard.py ──► data_loading (CLASS_LABELS only)
+```mermaid
+graph TD
+    OT[optuna_tuner.py] -->|_trainer_cls injection| TR[trainer.py]
+    OPE[optuna_per_experiment.py] -->|_trainer_cls injection| TR
+    RE[run_experiment.py] --> RA[run_all.py]
+    RA --> TR
+    TR --> CFG[config.py]
+    TR --> DL[data_loading.py]
+    TR --> MD[model.py]
+    TR --> EV[evaluate.py]
+    TR --> UT[utils.py]
+    TR --> WT[weight_tracker.py]
+    RA --> PL[parallel.py]
+    RA --> DB[dashboard.py]
+    DB -->|CLASS_LABELS only| DL
 ```
 
 ---
