@@ -1,0 +1,29 @@
+{
+  "event": "hurricane_florence_2018",
+  "budget": 5,
+  "seed_set": 1,
+  "test_error_rate": 25.382755842062853,
+  "test_macro_f1": 0.674749149880423,
+  "test_ece": 0.1506450223307951,
+  "test_per_class_f1": [
+    0.7088122605363985,
+    0.779783393501805,
+    0.5895953757225434,
+    0.9322033898305084,
+    0.8408551068883611,
+    0.32,
+    0.25,
+    0.8494623655913979,
+    0.8020304568527918
+  ],
+  "dev_error_rate": 23.943661971830988,
+  "dev_macro_f1": 0.6747142376177604,
+  "dev_ece": 0.1452779725124019,
+  "stopping_strategy": "balanced_dev",
+  "phase1_seed_strategy": "last",
+  "phase1_best_epoch": null,
+  "lambda1_mean": 1.0937135646632337,
+  "lambda1_std": 0.1809381158035125,
+  "lambda2_mean": 0.5987200112826773,
+  "lambda2_std": 0.14829684641653867
+}

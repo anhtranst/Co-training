@@ -1,0 +1,29 @@
+{
+  "event": "hurricane_dorian_2019",
+  "budget": 10,
+  "seed_set": 2,
+  "test_error_rate": 37.3342175066313,
+  "test_macro_f1": 0.5927793927916858,
+  "test_ece": 0.19648607091024634,
+  "test_per_class_f1": [
+    0.6113821138211382,
+    0.8682634730538922,
+    0.5684210526315789,
+    0.5454545454545454,
+    0.596244131455399,
+    0.3218390804597701,
+    0.24,
+    0.8,
+    0.783410138248848
+  ],
+  "dev_error_rate": 39.175257731958766,
+  "dev_macro_f1": 0.6057991567188556,
+  "dev_ece": 0.22227685748762693,
+  "stopping_strategy": "weighted_macro_f1",
+  "phase1_seed_strategy": "last",
+  "phase1_best_epoch": null,
+  "lambda1_mean": 1.0738900797736712,
+  "lambda1_std": 0.2069171821889029,
+  "lambda2_mean": 0.4887863630888909,
+  "lambda2_std": 0.16992736070591574
+}

@@ -1,0 +1,28 @@
+{
+  "event": "canada_wildfires_2016",
+  "budget": 10,
+  "seed_set": 2,
+  "test_error_rate": 24.943820224719104,
+  "test_macro_f1": 0.5886475082248194,
+  "test_ece": 0.08631401664755319,
+  "test_per_class_f1": [
+    0.3829787234042553,
+    0.8789808917197452,
+    0.8910891089108911,
+    0.1702127659574468,
+    0.41818181818181815,
+    0.2857142857142857,
+    0.8820224719101124,
+    0.8
+  ],
+  "dev_error_rate": 21.92982456140351,
+  "dev_macro_f1": 0.652230524686138,
+  "dev_ece": 0.11310989475041104,
+  "stopping_strategy": "balanced_dev",
+  "phase1_seed_strategy": "last",
+  "phase1_best_epoch": null,
+  "lambda1_mean": 1.050967098010502,
+  "lambda1_std": 0.20391629500616065,
+  "lambda2_mean": 0.5235223927237884,
+  "lambda2_std": 0.1997400963845
+}

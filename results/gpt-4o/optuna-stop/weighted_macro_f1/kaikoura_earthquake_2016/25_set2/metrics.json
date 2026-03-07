@@ -1,0 +1,29 @@
+{
+  "event": "kaikoura_earthquake_2016",
+  "budget": 25,
+  "seed_set": 2,
+  "test_error_rate": 28.04597701149425,
+  "test_macro_f1": 0.6884733342541431,
+  "test_ece": 0.15342597844956934,
+  "test_per_class_f1": [
+    0.6706586826347305,
+    0.8823529411764706,
+    0.855072463768116,
+    0.9333333333333333,
+    0.49382716049382713,
+    0.46875,
+    0.14285714285714285,
+    0.85,
+    0.8994082840236687
+  ],
+  "dev_error_rate": 29.464285714285708,
+  "dev_macro_f1": 0.6821819892657941,
+  "dev_ece": 0.14229497752551523,
+  "stopping_strategy": "weighted_macro_f1",
+  "phase1_seed_strategy": "last",
+  "phase1_best_epoch": null,
+  "lambda1_mean": 1.0230259500461079,
+  "lambda1_std": 0.20437869213972135,
+  "lambda2_mean": 0.5663995701833068,
+  "lambda2_std": 0.1776178888586728
+}
